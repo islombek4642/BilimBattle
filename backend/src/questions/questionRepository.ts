@@ -1,6 +1,8 @@
 import { pool } from '../config/db';
 
-export interface QuestionForClient {
+// Full server-side record, includes the correct answer — must not be sent to
+// players as-is; any client-facing payload must strip `correctIndex` first.
+export interface QuestionRecord {
   id: number;
   text: string;
   options: string[];
@@ -16,8 +18,13 @@ export function isValidCategory(key: string): boolean {
   return CATEGORIES.some((c) => c.key === key);
 }
 
-export async function getRandomQuestions(category: string, count: number): Promise<QuestionForClient[]> {
-  const result = await pool.query(
+export async function getRandomQuestions(category: string, count: number): Promise<QuestionRecord[]> {
+  const result = await pool.query<{
+    id: number;
+    question_text: string;
+    options: string[];
+    correct_index: number;
+  }>(
     `SELECT id, question_text, options, correct_index FROM questions WHERE category = $1 ORDER BY RANDOM() LIMIT $2`,
     [category, count]
   );
