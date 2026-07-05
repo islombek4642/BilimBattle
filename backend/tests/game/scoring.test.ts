@@ -21,4 +21,16 @@ describe('calculateScore', () => {
   it('clamps answer times beyond the limit to zero bonus', () => {
     expect(calculateScore(true, QUESTION_TIME_LIMIT_MS * 2)).toBe(BASE_CORRECT_POINTS);
   });
+
+  it('treats a negative answer time as an instant answer', () => {
+    expect(calculateScore(true, -50)).toBe(BASE_CORRECT_POINTS + MAX_SPEED_BONUS);
+  });
+
+  it('treats a NaN answer time as an instant answer', () => {
+    expect(calculateScore(true, NaN)).toBe(BASE_CORRECT_POINTS + MAX_SPEED_BONUS);
+  });
+
+  it('rounds a non-half-integer speed bonus to the nearest point', () => {
+    expect(calculateScore(true, 3333)).toBe(BASE_CORRECT_POINTS + 67);
+  });
 });

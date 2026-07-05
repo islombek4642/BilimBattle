@@ -14,10 +14,13 @@ export const MAX_SPEED_BONUS = 100;
  * the bonus is computed, so callers do not need to pre-validate it: negative
  * values (e.g. from clock skew) are treated as an instant answer, and values
  * beyond the limit are treated as a zero-bonus, on-time answer rather than
- * being rejected or scored negatively.
+ * being rejected or scored negatively. Non-finite values (NaN, +/-Infinity)
+ * are coerced to 0 (treated as an instant answer) before clamping, so a bad
+ * upstream time calculation can never produce a NaN score.
  */
 export function calculateScore(isCorrect: boolean, answerTimeMs: number): number {
   if (!isCorrect) return 0;
+  if (!Number.isFinite(answerTimeMs)) answerTimeMs = 0;
   const clampedTime = Math.min(Math.max(answerTimeMs, 0), QUESTION_TIME_LIMIT_MS);
   const remainingMs = QUESTION_TIME_LIMIT_MS - clampedTime;
   const speedBonus = Math.round((remainingMs / QUESTION_TIME_LIMIT_MS) * MAX_SPEED_BONUS);
