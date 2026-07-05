@@ -506,7 +506,7 @@ Expected: FAIL — module not found
 // backend/src/questions/questionRepository.ts
 import { pool } from '../config/db';
 
-export interface QuestionForClient {
+export interface QuestionRecord {
   id: number;
   text: string;
   options: string[];
@@ -522,7 +522,7 @@ export function isValidCategory(key: string): boolean {
   return CATEGORIES.some((c) => c.key === key);
 }
 
-export async function getRandomQuestions(category: string, count: number): Promise<QuestionForClient[]> {
+export async function getRandomQuestions(category: string, count: number): Promise<QuestionRecord[]> {
   const result = await pool.query(
     `SELECT id, question_text, options, correct_index FROM questions WHERE category = $1 ORDER BY RANDOM() LIMIT $2`,
     [category, count]
@@ -1294,7 +1294,7 @@ Expected: FAIL — module not found
 ```typescript
 // backend/src/game/gameState.ts
 import { redis } from '../config/redis';
-import { QuestionForClient } from '../questions/questionRepository';
+import { QuestionRecord } from '../questions/questionRepository';
 
 export interface PlayerAnswer {
   selectedOption: number;
@@ -1313,7 +1313,7 @@ export interface PlayerState {
 export interface GameState {
   gameId: string;
   category: string;
-  questions: QuestionForClient[];
+  questions: QuestionRecord[];
   currentQuestionIndex: number;
   questionStartedAt?: number;
   players: [PlayerState, PlayerState];
@@ -1784,7 +1784,7 @@ Expected: FAIL — module not found
 import { getIO } from '../socket/socketServer';
 import { getGame, saveGame, deleteGame, GameState } from './gameState';
 import { calculateScore, QUESTION_TIME_LIMIT_MS } from './scoring';
-import { getRandomQuestions, QuestionForClient } from '../questions/questionRepository';
+import { getRandomQuestions, QuestionRecord } from '../questions/questionRepository';
 import { recordMatchResult } from '../users/userRepository';
 
 export interface PlayerInfo {
@@ -1841,7 +1841,7 @@ async function sendNextQuestion(gameId: string): Promise<void> {
   activeTimers.set(gameId, timer);
 }
 
-function scheduleBotAnswer(gameId: string, botUserId: number, question: QuestionForClient): void {
+function scheduleBotAnswer(gameId: string, botUserId: number, question: QuestionRecord): void {
   const delay = 2000 + Math.random() * 6000;
   const willAnswerCorrectly = Math.random() < 0.7;
   const selected = willAnswerCorrectly ? question.correctIndex : (question.correctIndex + 1) % question.options.length;
