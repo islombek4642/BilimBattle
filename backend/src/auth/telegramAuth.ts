@@ -21,11 +21,20 @@ export function validateInitData(initData: string): TelegramUser | null {
   const secretKey = crypto.createHmac('sha256', 'WebAppData').update(env.telegramBotToken).digest();
   const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
-  if (computedHash !== hash) return null;
+  const computedHashBuffer = Buffer.from(computedHash, 'hex');
+  const hashBuffer = Buffer.from(hash, 'hex');
+  if (computedHashBuffer.length !== hashBuffer.length || !crypto.timingSafeEqual(computedHashBuffer, hashBuffer)) {
+    return null;
+  }
 
   const userJson = params.get('user');
   if (!userJson) return null;
 
-  const user = JSON.parse(userJson);
+  let user: { id: number; username?: string; first_name: string };
+  try {
+    user = JSON.parse(userJson);
+  } catch {
+    return null;
+  }
   return { id: user.id, username: user.username, first_name: user.first_name };
 }

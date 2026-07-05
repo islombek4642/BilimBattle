@@ -3,8 +3,12 @@ import crypto from 'crypto';
 const TEST_BOT_TOKEN = 'test-bot-token';
 
 function buildInitData(userObj: object, botToken: string): string {
+  return buildInitDataRaw(JSON.stringify(userObj), botToken);
+}
+
+function buildInitDataRaw(userRaw: string, botToken: string): string {
   const params = new URLSearchParams();
-  params.set('user', JSON.stringify(userObj));
+  params.set('user', userRaw);
   params.set('auth_date', '1700000000');
   params.set('query_id', 'AAEXXXXX');
 
@@ -45,6 +49,13 @@ describe('validateInitData', () => {
   it('returns null when hash is missing', () => {
     const { validateInitData } = require('../../src/auth/telegramAuth');
     const result = validateInitData('user=%7B%7D&auth_date=1700000000');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when the user param is malformed JSON', () => {
+    const { validateInitData } = require('../../src/auth/telegramAuth');
+    const initData = buildInitDataRaw('{not-valid-json', TEST_BOT_TOKEN);
+    const result = validateInitData(initData);
     expect(result).toBeNull();
   });
 });
