@@ -13,7 +13,20 @@ export interface User {
   bestStreak: number;
 }
 
-function mapRow(row: any): User {
+interface UserRow {
+  id: number;
+  telegram_id: string;
+  username: string | null;
+  first_name: string;
+  invited_by_telegram_id: string | null;
+  rating: number;
+  games_played: number;
+  games_won: number;
+  current_streak: number;
+  best_streak: number;
+}
+
+function mapRow(row: UserRow): User {
   return {
     id: row.id,
     telegramId: Number(row.telegram_id),
@@ -34,7 +47,9 @@ export async function upsertUser(
   firstName: string,
   invitedByTelegramId: number | null
 ): Promise<User> {
-  const result = await pool.query(
+  // ON CONFLICT deliberately only refreshes username/first_name — stats
+  // columns (rating, games_played, etc.) must never be reset by a login.
+  const result = await pool.query<UserRow>(
     `INSERT INTO users (telegram_id, username, first_name, invited_by_telegram_id)
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name
@@ -45,12 +60,12 @@ export async function upsertUser(
 }
 
 export async function getUserByTelegramId(telegramId: number): Promise<User | null> {
-  const result = await pool.query(`SELECT * FROM users WHERE telegram_id = $1`, [telegramId]);
+  const result = await pool.query<UserRow>(`SELECT * FROM users WHERE telegram_id = $1`, [telegramId]);
   return result.rows[0] ? mapRow(result.rows[0]) : null;
 }
 
 export async function getUserById(id: number): Promise<User | null> {
-  const result = await pool.query(`SELECT * FROM users WHERE id = $1`, [id]);
+  const result = await pool.query<UserRow>(`SELECT * FROM users WHERE id = $1`, [id]);
   return result.rows[0] ? mapRow(result.rows[0]) : null;
 }
 
@@ -102,6 +117,9 @@ async function updatePlayerStats(userId: number, won: boolean, hasWinner: boolea
       [userId]
     );
   } else {
+    // hasWinner is false only for genuine draws (finishGame sets winnerId: null
+    // when both players' scores are equal). By design, draws don't affect
+    // rating or streak — only games_played increments.
     await pool.query(`UPDATE users SET games_played = games_played + 1 WHERE id = $1`, [userId]);
   }
 }

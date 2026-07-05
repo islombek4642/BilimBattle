@@ -59,4 +59,29 @@ describe('userRepository', () => {
     expect(updatedLoser?.gamesWon).toBe(0);
     expect(updatedLoser?.rating).toBe(990);
   });
+
+  it('does not change rating or streak on a draw', async () => {
+    const player1 = await upsertUser(111, 'p1', 'P1', null);
+    const player2 = await upsertUser(222, 'p2', 'P2', null);
+
+    await recordMatchResult({
+      category: 'umumiy_bilim',
+      player1Id: player1.id,
+      player2Id: player2.id,
+      player1Score: 400,
+      player2Score: 400,
+      winnerId: null,
+    });
+
+    const updated1 = await getUserByTelegramId(111);
+    const updated2 = await getUserByTelegramId(222);
+
+    expect(updated1?.gamesPlayed).toBe(1);
+    expect(updated1?.rating).toBe(1000);
+    expect(updated1?.currentStreak).toBe(0);
+
+    expect(updated2?.gamesPlayed).toBe(1);
+    expect(updated2?.rating).toBe(1000);
+    expect(updated2?.currentStreak).toBe(0);
+  });
 });
