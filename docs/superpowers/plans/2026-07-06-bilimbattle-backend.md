@@ -1240,7 +1240,7 @@ git commit -m "feat: add POST /api/auth/login with referral tracking"
 
 ```typescript
 // backend/tests/game/gameState.test.ts
-import { redis } from '../../src/config/redis';
+import { redis, closeRedis } from '../../src/config/redis';
 import { saveGame, getGame, deleteGame, GameState } from '../../src/game/gameState';
 
 describe('gameState', () => {
@@ -1261,7 +1261,7 @@ describe('gameState', () => {
   });
 
   afterAll(async () => {
-    await redis.quit();
+    await closeRedis();
   });
 
   it('saves and retrieves a game by id', async () => {
@@ -1305,7 +1305,7 @@ export interface PlayerState {
   userId: number;
   socketId: string;
   score: number;
-  answers: (PlayerAnswer | undefined)[];
+  answers: (PlayerAnswer | null)[];
   isBot: boolean;
   disconnectedAt?: number;
 }
@@ -1436,7 +1436,7 @@ git commit -m "feat: add correctness + speed-bonus scoring formula"
 
 ```typescript
 // backend/tests/matchmaking/queue.test.ts
-import { redis } from '../../src/config/redis';
+import { redis, closeRedis } from '../../src/config/redis';
 import { joinQueue, leaveQueue, popTwoIfAvailable } from '../../src/matchmaking/queue';
 
 describe('matchmaking queue', () => {
@@ -1447,7 +1447,7 @@ describe('matchmaking queue', () => {
   });
 
   afterAll(async () => {
-    await redis.quit();
+    await closeRedis();
   });
 
   it('returns null when fewer than two players are queued', async () => {
@@ -1690,7 +1690,7 @@ git commit -m "feat: add Socket.io server with auth and single-session enforceme
 ```typescript
 // backend/tests/game/gameEngine.test.ts
 import { pool } from '../../src/config/db';
-import { redis } from '../../src/config/redis';
+import { redis, closeRedis } from '../../src/config/redis';
 import { setIOForTesting } from '../../src/socket/socketServer';
 import { startGame, submitAnswer } from '../../src/game/gameEngine';
 import { getGame } from '../../src/game/gameState';
@@ -1726,7 +1726,7 @@ describe('gameEngine full match flow', () => {
     await pool.query(`DELETE FROM matches WHERE player1_id = $1 OR player2_id = $1`, [player1Id]);
     await pool.query(`DELETE FROM users WHERE telegram_id IN (7001, 7002)`);
     await pool.end();
-    await redis.quit();
+    await closeRedis();
   });
 
   it('runs a full 7-question match and persists the result', async () => {
@@ -1855,7 +1855,7 @@ export async function submitAnswer(gameId: string, userId: number, selectedOptio
   if (!game || game.status !== 'active') return;
   const player = game.players.find((p) => p.userId === userId);
   if (!player) return;
-  if (player.answers[game.currentQuestionIndex] !== undefined) return;
+  if (player.answers[game.currentQuestionIndex] != null) return;
 
   const answerTimeMs = Date.now() - (game.questionStartedAt ?? Date.now());
   const question = game.questions[game.currentQuestionIndex];
@@ -1865,7 +1865,7 @@ export async function submitAnswer(gameId: string, userId: number, selectedOptio
   player.score += points;
   await saveGame(game);
 
-  const bothAnswered = game.players.every((p) => p.answers[game.currentQuestionIndex] !== undefined);
+  const bothAnswered = game.players.every((p) => p.answers[game.currentQuestionIndex] != null);
   if (bothAnswered) {
     const timer = activeTimers.get(gameId);
     if (timer) clearTimeout(timer);
@@ -1954,7 +1954,7 @@ git commit -m "feat: add game engine with question flow, scoring, and bot answer
 ```typescript
 // backend/tests/matchmaking/matchmaker.test.ts
 import { pool } from '../../src/config/db';
-import { redis } from '../../src/config/redis';
+import { redis, closeRedis } from '../../src/config/redis';
 import { setIOForTesting } from '../../src/socket/socketServer';
 import { handleJoinQueue } from '../../src/matchmaking/matchmaker';
 import { upsertUser } from '../../src/users/userRepository';
@@ -2007,7 +2007,7 @@ describe('matchmaker', () => {
     await pool.query(`DELETE FROM users WHERE telegram_id IN (7201, 7202)`);
     await redis.del('queue:umumiy_bilim');
     await pool.end();
-    await redis.quit();
+    await closeRedis();
   });
 
   it('matches two queued players immediately and emits match_found', async () => {
@@ -2156,7 +2156,7 @@ git commit -m "feat: add matchmaker with pairing and bot fallback"
 ```typescript
 // backend/tests/game/gameEngineDisconnect.test.ts
 import { pool } from '../../src/config/db';
-import { redis } from '../../src/config/redis';
+import { redis, closeRedis } from '../../src/config/redis';
 import { setIOForTesting } from '../../src/socket/socketServer';
 import { startGame, handleDisconnect, handleReconnect } from '../../src/game/gameEngine';
 import { upsertUser } from '../../src/users/userRepository';
@@ -2191,7 +2191,7 @@ describe('gameEngine disconnect/reconnect handling', () => {
     await pool.query(`DELETE FROM matches WHERE player1_id = $1 OR player2_id = $1`, [player1Id]);
     await pool.query(`DELETE FROM users WHERE telegram_id IN (7101, 7102)`);
     await pool.end();
-    await redis.quit();
+    await closeRedis();
   });
 
   beforeEach(() => {
@@ -2690,12 +2690,12 @@ git commit -m "feat: add user stats endpoint"
 
 ```typescript
 // backend/tests/invite/inviteRoom.test.ts
-import { redis } from '../../src/config/redis';
+import { redis, closeRedis } from '../../src/config/redis';
 import { createInvite, consumeInvite } from '../../src/invite/inviteRoom';
 
 describe('inviteRoom', () => {
   afterAll(async () => {
-    await redis.quit();
+    await closeRedis();
   });
 
   it('returns null when no invite exists for the inviter', async () => {
