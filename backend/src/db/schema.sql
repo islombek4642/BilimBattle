@@ -33,6 +33,5 @@ CREATE TABLE IF NOT EXISTS matches (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
 CREATE INDEX IF NOT EXISTS idx_questions_category ON questions(category);
 CREATE INDEX IF NOT EXISTS idx_users_rating ON users(rating DESC);
