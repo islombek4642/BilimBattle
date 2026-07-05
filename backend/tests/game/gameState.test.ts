@@ -1,4 +1,4 @@
-import { redis } from '../../src/config/redis';
+import { closeRedis } from '../../src/config/redis';
 import { saveGame, getGame, deleteGame, GameState } from '../../src/game/gameState';
 
 describe('gameState', () => {
@@ -19,7 +19,7 @@ describe('gameState', () => {
   });
 
   afterAll(async () => {
-    await redis.quit();
+    await closeRedis();
   });
 
   it('saves and retrieves a game by id', async () => {

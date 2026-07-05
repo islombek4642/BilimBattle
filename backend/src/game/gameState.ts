@@ -10,7 +10,7 @@ export interface PlayerState {
   userId: number;
   socketId: string;
   score: number;
-  answers: (PlayerAnswer | undefined)[];
+  answers: (PlayerAnswer | null)[];
   isBot: boolean;
   disconnectedAt?: number;
 }
