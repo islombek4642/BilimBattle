@@ -12,6 +12,10 @@ import { authRouter } from '../../src/auth/authRoutes';
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN as string;
 
 function buildInitData(userObj: object): string {
+  return buildInitDataWithToken(userObj, BOT_TOKEN);
+}
+
+function buildInitDataWithToken(userObj: object, botToken: string): string {
   const params = new URLSearchParams();
   params.set('user', JSON.stringify(userObj));
   params.set('auth_date', '1700000000');
@@ -19,7 +23,7 @@ function buildInitData(userObj: object): string {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => `${key}=${value}`)
     .join('\n');
-  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
   const hash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
   params.set('hash', hash);
   return params.toString();
@@ -31,13 +35,19 @@ describe('POST /api/auth/login', () => {
   app.use('/api', authRouter);
 
   afterAll(async () => {
-    await pool.query(`DELETE FROM users WHERE telegram_id IN (555, 556)`);
+    await pool.query(`DELETE FROM users WHERE telegram_id IN (555, 556, 557)`);
     await pool.end();
   });
 
   it('rejects requests with no initData', async () => {
     const res = await request(app).post('/api/auth/login').send({});
     expect(res.status).toBe(400);
+  });
+
+  it('rejects requests with invalid initData', async () => {
+    const initData = buildInitDataWithToken({ id: 555, first_name: 'Dilnoza' }, 'wrong-bot-token');
+    const res = await request(app).post('/api/auth/login').send({ initData });
+    expect(res.status).toBe(401);
   });
 
   it('creates a session for valid initData', async () => {
@@ -53,5 +63,12 @@ describe('POST /api/auth/login', () => {
     const res = await request(app).post('/api/auth/login').send({ initData, startParam: 'invite_555' });
     expect(res.status).toBe(200);
     expect(res.body.user.invitedByTelegramId).toBe(555);
+  });
+
+  it('ignores a startParam that points at the user\'s own telegram id', async () => {
+    const initData = buildInitData({ id: 557, first_name: 'Kamola' });
+    const res = await request(app).post('/api/auth/login').send({ initData, startParam: 'invite_557' });
+    expect(res.status).toBe(200);
+    expect(res.body.user.invitedByTelegramId).toBeNull();
   });
 });
