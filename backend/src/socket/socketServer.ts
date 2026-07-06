@@ -2,11 +2,36 @@ import { Server, Socket } from 'socket.io';
 import { createServer } from 'http';
 import { verifySession } from '../auth/jwt';
 
-let io: Server | null = null;
-const activeSocketsByUser = new Map<number, string>();
+export interface SocketData {
+  userId: number;
+  telegramId: number;
+}
 
-export function initSocketServer(httpServer: ReturnType<typeof createServer>): Server {
-  io = new Server(httpServer, { cors: { origin: '*' } });
+type AppServer = Server<any, any, any, SocketData>;
+type AppSocket = Socket<any, any, any, SocketData>;
+
+let io: AppServer | null = null;
+let activeSocketsByUser = new Map<number, string>();
+
+function trackActiveSocket(io: AppServer, socket: AppSocket, userId: number): void {
+  const existingSocketId = activeSocketsByUser.get(userId);
+  if (existingSocketId && existingSocketId !== socket.id) {
+    const existingSocket = io.sockets.sockets.get(existingSocketId);
+    existingSocket?.emit('session_replaced');
+    existingSocket?.disconnect(true);
+  }
+  activeSocketsByUser.set(userId, socket.id);
+
+  socket.on('disconnect', () => {
+    if (activeSocketsByUser.get(userId) === socket.id) {
+      activeSocketsByUser.delete(userId);
+    }
+  });
+}
+
+export function initSocketServer(httpServer: ReturnType<typeof createServer>): AppServer {
+  activeSocketsByUser = new Map<number, string>();
+  io = new Server<any, any, any, SocketData>(httpServer, { cors: { origin: '*' } });
 
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token as string | undefined;
@@ -24,33 +49,20 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): S
     next();
   });
 
-  io.on('connection', (socket: Socket) => {
-    const userId = socket.data.userId as number;
-    const existingSocketId = activeSocketsByUser.get(userId);
-    if (existingSocketId && existingSocketId !== socket.id) {
-      const existingSocket = io!.sockets.sockets.get(existingSocketId);
-      existingSocket?.emit('session_replaced');
-      existingSocket?.disconnect(true);
-    }
-    activeSocketsByUser.set(userId, socket.id);
-
-    socket.on('disconnect', () => {
-      if (activeSocketsByUser.get(userId) === socket.id) {
-        activeSocketsByUser.delete(userId);
-      }
-    });
+  io.on('connection', (socket: AppSocket) => {
+    trackActiveSocket(io!, socket, socket.data.userId);
   });
 
   return io;
 }
 
-export function getIO(): Server {
+export function getIO(): AppServer {
   if (!io) {
     throw new Error('Socket.io server hali ishga tushirilmagan');
   }
   return io;
 }
 
-export function setIOForTesting(mockIO: Server): void {
+export function setIOForTesting(mockIO: AppServer): void {
   io = mockIO;
 }

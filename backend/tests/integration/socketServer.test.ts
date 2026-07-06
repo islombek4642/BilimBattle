@@ -30,6 +30,15 @@ describe('socket server session handling', () => {
     });
   });
 
+  it('rejects a connection with no token at all', (done) => {
+    const client: ClientSocket = ioClient(`http://localhost:${port}`, { auth: {} });
+    client.on('connect_error', (err) => {
+      expect(err.message).toContain('topilmadi');
+      client.close();
+      done();
+    });
+  });
+
   it('disconnects the previous socket when the same user connects again', (done) => {
     const token = signSession({ userId: 9999, telegramId: 9999 });
     const clientA: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token } });
