@@ -73,9 +73,26 @@ describe('gameEngine full match flow', () => {
     await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' });
 
     await submitAnswer(gameId, player1Id, 0);
-    await submitAnswer(gameId, player1Id, 2);
+    await submitAnswer(gameId, player1Id, 2); // ignored: player1 already answered question 0
 
-    const game = await getGame(gameId);
-    expect(game!.players.find((p) => p.userId === player1Id)!.answers[0]?.selectedOption).toBe(0);
+    // Assert the duplicate was ignored *before* the question resolves and the
+    // game advances — resolveQuestion() eventually deletes the Redis game
+    // state once the match finishes, so this has to be checked mid-game.
+    const midGame = await getGame(gameId);
+    expect(midGame!.players.find((p) => p.userId === player1Id)!.answers[0]?.selectedOption).toBe(0);
+
+    // Play the rest of the match to completion instead of abandoning it after
+    // question 0. Answering only one question leaves every *subsequent*
+    // question's 10s timer pending (resolveQuestion() always schedules the
+    // next question's timer until the match finishes) — that dangling timer
+    // fires ~10s later, after this test file's Redis connection is already
+    // closed in afterAll, producing "Jest did not exit" / "Connection is
+    // closed" noise on every run. Finishing the match lets finishGame() clear
+    // and delete all game state cleanly, with no leftover timer.
+    await submitAnswer(gameId, player2Id, 1);
+    for (let i = 1; i < 7; i += 1) {
+      await submitAnswer(gameId, player1Id, 0);
+      await submitAnswer(gameId, player2Id, 1);
+    }
   });
 });

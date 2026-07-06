@@ -11,6 +11,13 @@ export interface PlayerInfo {
 }
 
 const QUESTIONS_PER_GAME = 7;
+// In-process only (not persisted, not shared across instances). A game that
+// never reaches finishGame (process crash, or a player abandoning mid-game
+// with no reconnect support yet) simply leaves its entry here until the
+// pending timer fires after QUESTION_TIME_LIMIT_MS, at which point it
+// self-cleans via the resolveQuestion()/finishGame() chain (see the .catch()
+// below for what happens if that chain itself fails). Task 18 adds
+// disconnect/reconnect handling to this file and may need to revisit this.
 const activeTimers = new Map<string, NodeJS.Timeout>();
 
 export async function startGame(gameId: string, category: string, player1: PlayerInfo, player2: PlayerInfo): Promise<void> {
@@ -91,6 +98,14 @@ export async function submitAnswer(
   selectedOption: number,
   expectedQuestionIndex?: number
 ): Promise<void> {
+  // NOT ATOMIC: getGame -> mutate in memory -> saveGame is a read-modify-write
+  // across two separate Redis round-trips (same class of issue documented in
+  // matchmaking/queue.ts's popTwoIfAvailable). Safe for the current
+  // single-instance MVP since each Socket.io event handler runs to
+  // completion within one event-loop tick before the next 'submit_answer'
+  // event is processed, but this would need a Lua script / WATCH-based
+  // transaction if this ever needs to be safe against truly concurrent
+  // writers to the same game (e.g. multiple server instances).
   const game = await getGame(gameId);
   if (!game || game.status !== 'active') return;
   if (expectedQuestionIndex !== undefined && game.currentQuestionIndex !== expectedQuestionIndex) return;

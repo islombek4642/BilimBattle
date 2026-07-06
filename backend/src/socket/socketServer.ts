@@ -53,8 +53,8 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
   io.on('connection', (socket: AppSocket) => {
     trackActiveSocket(io!, socket, socket.data.userId);
 
-    socket.on('submit_answer', async ({ gameId, selectedOption }: { gameId: string; selectedOption: number }) => {
-      await submitAnswer(gameId, socket.data.userId, selectedOption);
+    socket.on('submit_answer', async ({ gameId, questionIndex, selectedOption }: { gameId: string; questionIndex: number; selectedOption: number }) => {
+      await submitAnswer(gameId, socket.data.userId, selectedOption, questionIndex);
     });
   });
 
