@@ -1,7 +1,8 @@
 import { Server, Socket } from 'socket.io';
 import { createServer } from 'http';
 import { verifySession } from '../auth/jwt';
-import { submitAnswer } from '../game/gameEngine';
+import { submitAnswer, handleDisconnect, handleReconnect } from '../game/gameEngine';
+import { getGame } from '../game/gameState';
 import { handleJoinQueue, cancelWaiting } from '../matchmaking/matchmaker';
 
 export interface SocketData {
@@ -65,6 +66,36 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
 
     socket.on('leave_queue', ({ category }: { category: string }) => {
       cancelWaiting(socket.data.userId, category);
+    });
+
+    socket.on('reconnect_game', async ({ gameId }: { gameId: string }, ack: (state: unknown) => void) => {
+      const reconnected = await handleReconnect(gameId, socket.data.userId, socket.id);
+      if (!reconnected) {
+        ack({ found: false });
+        return;
+      }
+      socket.join(gameId);
+      socket.data.gameId = gameId;
+      const game = await getGame(gameId);
+      ack({
+        found: true,
+        currentQuestionIndex: game!.currentQuestionIndex,
+        scores: game!.players.map((p) => ({ userId: p.userId, score: p.score })),
+      });
+    });
+
+    // Separate from trackActiveSocket's own 'disconnect' listener (which only
+    // enforces single-session-per-user bookkeeping) - Socket.io supports
+    // multiple listeners for the same event, and keeping this one separate
+    // avoids touching trackActiveSocket's existing behavior. Only forfeit-eligible
+    // if this socket was actually in an active game (socket.data.gameId is set
+    // by createMatch on match start and by reconnect_game above).
+    socket.on('disconnect', () => {
+      if (socket.data.gameId) {
+        handleDisconnect(socket.data.gameId, socket.data.userId).catch((err) => {
+          console.error(`socketServer: failed to handle disconnect for game ${socket.data.gameId}`, err);
+        });
+      }
     });
   });
 

@@ -170,3 +170,121 @@ async function finishGame(gameId: string): Promise<void> {
 
   await deleteGame(gameId);
 }
+
+const RECONNECT_GRACE_MS = 10_000;
+// Same lifecycle caveat as activeTimers above: in-process only, keyed by
+// `${gameId}:${userId}` so each player's grace period is tracked
+// independently. Always cleared by exactly one of: a reconnect
+// (handleReconnect), the grace timer itself firing (forfeitIfStillDisconnected
+// deletes its own entry first thing), or superseded by a later disconnect (see
+// the clearTimeout below).
+const disconnectTimers = new Map<string, NodeJS.Timeout>();
+
+export async function handleDisconnect(gameId: string, userId: number): Promise<void> {
+  const game = await getGame(gameId);
+  if (!game || game.status !== 'active') return;
+  const player = game.players.find((p) => p.userId === userId);
+  if (!player) return;
+  player.disconnectedAt = Date.now();
+  await saveGame(game);
+
+  const timerKey = `${gameId}:${userId}`;
+  // A flaky connection can call handleDisconnect twice in a row with no
+  // reconnect in between (disconnect -> disconnect again). Without clearing
+  // any previous timer first, disconnectTimers.set() below would silently
+  // overwrite the map entry while the FIRST setTimeout keeps running
+  // underneath - forfeitIfStillDisconnected would then fire twice for the same
+  // (gameId, userId). Since deleteGame() only removes the Redis document
+  // (there's no cross-call lock), a second invocation racing close behind the
+  // first could still observe status === 'active' and double-emit
+  // 'game_over' / double-call recordMatchResult. Clearing the existing timer
+  // first guarantees at most one pending forfeit timer per (gameId, userId)
+  // and makes repeated disconnects simply restart the grace window, which is
+  // also the right user-facing behavior.
+  const existingTimer = disconnectTimers.get(timerKey);
+  if (existingTimer) clearTimeout(existingTimer);
+
+  const timer = setTimeout(() => {
+    // Fire-and-forget, same discipline as the question-timeout timer above:
+    // forfeitIfStillDisconnected is async and this callback isn't awaited by
+    // anything, so an unhandled rejection here would crash the process.
+    forfeitIfStillDisconnected(gameId, userId).catch((err) => {
+      console.error(`gameEngine: failed to process forfeit for game ${gameId}, user ${userId}`, err);
+    });
+  }, RECONNECT_GRACE_MS);
+  disconnectTimers.set(timerKey, timer);
+}
+
+export async function handleReconnect(gameId: string, userId: number, newSocketId: string): Promise<boolean> {
+  const game = await getGame(gameId);
+  if (!game || game.status !== 'active') return false;
+  const player = game.players.find((p) => p.userId === userId);
+  if (!player) return false;
+
+  player.socketId = newSocketId;
+  player.disconnectedAt = undefined;
+  await saveGame(game);
+
+  const timerKey = `${gameId}:${userId}`;
+  const timer = disconnectTimers.get(timerKey);
+  if (timer) {
+    clearTimeout(timer);
+    disconnectTimers.delete(timerKey);
+  }
+  return true;
+}
+
+async function forfeitIfStillDisconnected(gameId: string, userId: number): Promise<void> {
+  const timerKey = `${gameId}:${userId}`;
+  disconnectTimers.delete(timerKey);
+  const game = await getGame(gameId);
+  if (!game || game.status !== 'active') return;
+  const player = game.players.find((p) => p.userId === userId);
+  if (!player?.disconnectedAt) return;
+
+  const opponent = game.players.find((p) => p.userId !== userId)!;
+
+  // RECONNECT_GRACE_MS currently equals QUESTION_TIME_LIMIT_MS, so it's
+  // possible for this timer and the pending question-timeout timer
+  // (activeTimers) to be scheduled for the exact same instant and both fire
+  // in the same tick (this happens in gameEngineDisconnect.test.ts, which
+  // disconnects a player immediately after startGame - i.e. right as the
+  // first question's timer is armed). Clearing whatever question timer is
+  // currently registered for this game prevents a stale next-question timer
+  // from firing after we've already ended the match via forfeit below.
+  //
+  // There remains the same class of non-atomic read-modify-write race already
+  // documented on submitAnswer()/finishGame(): resolveQuestion()'s own
+  // saveGame() could race with this function's saveGame() if both read the
+  // game before either writes. In practice this is benign here -
+  // resolveQuestion() only ever advances the question index or calls
+  // finishGame(); it never resets status back to 'active', and both this
+  // function and finishGame() null-check getGame()'s result before acting, so
+  // whichever of "forfeit" or "natural finish" writes `status: 'finished'`
+  // and deletes the game first "wins", and the other observes a missing/
+  // non-active game and safely no-ops. A true simultaneous forfeit-and-finish
+  // could in the worst case double-call recordMatchResult - the same
+  // MVP-acceptable tradeoff already made elsewhere in this file.
+  const timer = activeTimers.get(gameId);
+  if (timer) clearTimeout(timer);
+
+  game.status = 'finished';
+  await saveGame(game);
+
+  getIO().to(gameId).emit('game_over', {
+    scores: game.players.map((p) => ({ userId: p.userId, score: p.score })),
+    winnerId: opponent.userId,
+    forfeited: true,
+  });
+
+  await recordMatchResult({
+    category: game.category,
+    player1Id: game.players[0].userId,
+    player2Id: game.players[1].userId,
+    player1Score: game.players[0].score,
+    player2Score: game.players[1].score,
+    winnerId: opponent.userId,
+  });
+
+  await deleteGame(gameId);
+}
