@@ -17,12 +17,19 @@ export async function joinQueue(category: string, player: QueuedPlayer): Promise
   await redis.rpush(queueKey(category), JSON.stringify(player));
 }
 
-export async function leaveQueue(category: string, userId: number): Promise<void> {
+// Returns whether an entry for this user was actually found and removed.
+// Callers that need to distinguish "this user was still queued" from "this
+// user was already popped out by a pairing" (matchmaker.ts's bot-fallback
+// path does) rely on this return value — see matchmaker.ts for why that
+// distinction matters.
+export async function leaveQueue(category: string, userId: number): Promise<boolean> {
   const items = await redis.lrange(queueKey(category), 0, -1);
   const match = items.find((item) => parsePlayer(item).userId === userId);
   if (match) {
     await redis.lrem(queueKey(category), 1, match);
+    return true;
   }
+  return false;
 }
 
 // NOT ATOMIC: LLEN + two LPOPs are three separate Redis round-trips.

@@ -2,14 +2,16 @@ import { Server, Socket } from 'socket.io';
 import { createServer } from 'http';
 import { verifySession } from '../auth/jwt';
 import { submitAnswer } from '../game/gameEngine';
+import { handleJoinQueue, cancelWaiting } from '../matchmaking/matchmaker';
 
 export interface SocketData {
   userId: number;
   telegramId: number;
+  gameId?: string;
 }
 
-type AppServer = Server<any, any, any, SocketData>;
-type AppSocket = Socket<any, any, any, SocketData>;
+export type AppServer = Server<any, any, any, SocketData>;
+export type AppSocket = Socket<any, any, any, SocketData>;
 
 let io: AppServer | null = null;
 let activeSocketsByUser = new Map<number, string>();
@@ -55,6 +57,14 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
 
     socket.on('submit_answer', async ({ gameId, questionIndex, selectedOption }: { gameId: string; questionIndex: number; selectedOption: number }) => {
       await submitAnswer(gameId, socket.data.userId, selectedOption, questionIndex);
+    });
+
+    socket.on('join_queue', async ({ category }: { category: string }) => {
+      await handleJoinQueue(io!, socket.id, socket.data.userId, category);
+    });
+
+    socket.on('leave_queue', ({ category }: { category: string }) => {
+      cancelWaiting(socket.data.userId, category);
     });
   });
 
