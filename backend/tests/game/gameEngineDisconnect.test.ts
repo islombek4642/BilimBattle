@@ -32,26 +32,24 @@ function createFakeIO() {
 // (1) tell useFakeTimers to leave nextTick/setImmediate/hrtime real (below),
 // so ioredis/pg can actually settle their promises, while setTimeout/
 // setInterval stay fake and fully under our control via
-// advanceTimersByTime; and (2) yield real event-loop turns (not just
-// microtasks) after advancing timers, so the async chain the fake timer
-// kicked off (getGame -> saveGame -> emit -> recordMatchResult -> deleteGame)
-// has enough real turns to run to completion before we assert. Forty turns is
-// generously more than the ~2-3 real round trips that chain needs (measured
-// empirically), and in practice the two required assertions (winnerId,
-// forfeited, and "no game_over on reconnect") pass reliably with this margin.
-// Note: because the actual completion time of real Redis/Postgres I/O is a
-// function of wall-clock time, not "how many turns we spun", there is no
-// turn count that provides an absolute guarantee - only a very high
-// probability. On rare runs a *second*, harmless "gameEngine: failed to
-// process forfeit/resolve question" console.error can still appear (from a
-// fire-and-forget .catch() handler discovering afterAll's cleanup already ran
-// by the time its own chain finally settles) without affecting the
-// assertions above, which by then have already observed the correct events.
-// This is the same class of test-teardown-vs-timer-driven-async-chain race
-// already called out in gameEngine.test.ts's comments; it's noise, not a
-// functional bug.
-async function flushRealAsyncWork(turns = 40): Promise<void> {
-  for (let i = 0; i < turns; i += 1) {
+// advanceTimersByTime; and (2) actually poll for the condition each test
+// cares about using real event-loop turns (not just microtasks), instead of
+// spinning a fixed number of turns and hoping it was enough. Polling a real
+// predicate is both faster on the common case (returns as soon as the
+// condition is true) and more robust than a fixed iteration count, which can
+// never be an absolute guarantee since real I/O completion time is a
+// function of wall-clock time, not "how many turns we spun". On rare runs a
+// *second*, harmless "gameEngine: failed to process forfeit/resolve
+// question" console.error can still appear (from a fire-and-forget .catch()
+// handler discovering afterAll's cleanup already ran by the time its own
+// trailing chain - e.g. recordMatchResult/deleteGame after the awaited
+// condition already became true - finally settles) without affecting the
+// assertions below, which by then have already observed the correct events.
+// That's noise from the test-teardown-vs-timer-driven-async-chain overlap,
+// not a functional bug.
+async function waitUntil(predicate: () => boolean, timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate() && Date.now() < deadline) {
     await new Promise((resolve) => setImmediate(resolve));
   }
 }
@@ -75,13 +73,17 @@ describe('gameEngine disconnect/reconnect handling', () => {
   });
 
   beforeEach(() => {
-    // See flushRealAsyncWork's comment above for why nextTick/setImmediate/
-    // hrtime must stay real: setTimeout/setInterval are what gameEngine.ts
-    // actually schedules its timers with, so faking only those is enough to
+    // See waitUntil's comment above for why nextTick/setImmediate/hrtime must
+    // stay real: setTimeout/setInterval are what gameEngine.ts actually
+    // schedules its timers with, so faking only those is enough to
     // deterministically control the 10s grace/timeout windows via
     // advanceTimersByTime, while real Redis/Postgres calls made from inside
-    // those timer callbacks keep working normally.
-    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'hrtime'] });
+    // those timer callbacks keep working normally. Date is also left real -
+    // waitUntil's timeout deadline is computed with Date.now(), which would
+    // never advance (and the deadline would never be reached) if Date were
+    // faked, since nothing in these tests calls advanceTimersByTime again
+    // after the initial 10s jump.
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'hrtime', 'Date'] });
   });
 
   afterEach(() => {
@@ -97,7 +99,7 @@ describe('gameEngine disconnect/reconnect handling', () => {
 
     await handleDisconnect(gameId, player1Id);
     jest.advanceTimersByTime(10_000);
-    await flushRealAsyncWork();
+    await waitUntil(() => events.some((e) => e.event === 'game_over'));
 
     const gameOverEvent = events.find((e) => e.event === 'game_over');
     expect(gameOverEvent).toBeDefined();
@@ -114,17 +116,21 @@ describe('gameEngine disconnect/reconnect handling', () => {
     await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' });
 
     await handleDisconnect(gameId, player1Id);
-    const reconnected = await handleReconnect(gameId, player1Id, 'sock1-new');
-    expect(reconnected).toBe(true);
+    // handleReconnect now returns the GameState directly (or null on
+    // failure) rather than a boolean - assert it's a non-null object rather
+    // than `=== true`.
+    const reconnectedGame = await handleReconnect(gameId, player1Id, 'sock1-new');
+    expect(reconnectedGame).not.toBeNull();
+    expect(reconnectedGame?.gameId).toBe(gameId);
 
     jest.advanceTimersByTime(10_000);
     // No disconnect timer is pending here (handleReconnect cleared it above),
     // but the ordinary question-timeout timer armed by startGame still fires
     // and kicks off its own real getGame/saveGame/emit chain (resolveQuestion
-    // -> sendNextQuestion) for question 0. Flush it to completion too so it
-    // can't leak into afterAll's pool.end()/closeRedis() (see
-    // flushRealAsyncWork's comment above).
-    await flushRealAsyncWork();
+    // -> sendNextQuestion) for question 0. Wait for that chain to reach its
+    // observable end state (the next 'question' event) so it can't leak into
+    // afterAll's pool.end()/closeRedis() (see waitUntil's comment above).
+    await waitUntil(() => events.filter((e) => e.event === 'question').length >= 2);
 
     const gameOverEvent = events.find((e) => e.event === 'game_over');
     expect(gameOverEvent).toBeUndefined();

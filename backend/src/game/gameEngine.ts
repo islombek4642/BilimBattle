@@ -172,13 +172,37 @@ async function finishGame(gameId: string): Promise<void> {
 }
 
 const RECONNECT_GRACE_MS = 10_000;
+
+interface DisconnectEntry {
+  timer: NodeJS.Timeout;
+  version: number;
+}
+
 // Same lifecycle caveat as activeTimers above: in-process only, keyed by
 // `${gameId}:${userId}` so each player's grace period is tracked
 // independently. Always cleared by exactly one of: a reconnect
 // (handleReconnect), the grace timer itself firing (forfeitIfStillDisconnected
-// deletes its own entry first thing), or superseded by a later disconnect (see
-// the clearTimeout below).
-const disconnectTimers = new Map<string, NodeJS.Timeout>();
+// deletes its own entry first thing), or superseded by a later disconnect.
+//
+// Each entry also carries a monotonically increasing `version`. This isn't
+// just for the same-tick double-disconnect case (clearing a stale timer
+// before scheduling a new one) - it's required because handleDisconnect and
+// handleReconnect are both async with a `getGame`/`saveGame` round trip in
+// the middle, so a *slower* handleReconnect call started before a *faster*
+// handleDisconnect call can still finish after it: disconnect(D1) schedules
+// timer T1 -> reconnect(R) starts awaiting getGame/saveGame -> disconnect(D2)
+// arrives and runs to completion first (clears T1, schedules T2) -> R finally
+// resumes and would, without a version check, clear whatever timer is
+// CURRENTLY in the map (T2) and delete the map entry - leaving
+// player.disconnectedAt set (from D2) but with NO pending timer at all. The
+// game would then be stuck with a disconnected player and no forfeit would
+// ever fire until the 30-minute Redis TTL silently drops it. Stamping each
+// scheduled timer with the version that was current when *it* was created,
+// and having every consumer (reconnect, and the timer callback itself)
+// compare against the CURRENT map entry's version before acting, makes each
+// operation only affect the timer it actually knows about.
+const disconnectTimers = new Map<string, DisconnectEntry>();
+let nextDisconnectVersion = 0;
 
 export async function handleDisconnect(gameId: string, userId: number): Promise<void> {
   const game = await getGame(gameId);
@@ -194,48 +218,65 @@ export async function handleDisconnect(gameId: string, userId: number): Promise<
   // any previous timer first, disconnectTimers.set() below would silently
   // overwrite the map entry while the FIRST setTimeout keeps running
   // underneath - forfeitIfStillDisconnected would then fire twice for the same
-  // (gameId, userId). Since deleteGame() only removes the Redis document
-  // (there's no cross-call lock), a second invocation racing close behind the
-  // first could still observe status === 'active' and double-emit
-  // 'game_over' / double-call recordMatchResult. Clearing the existing timer
-  // first guarantees at most one pending forfeit timer per (gameId, userId)
-  // and makes repeated disconnects simply restart the grace window, which is
-  // also the right user-facing behavior.
-  const existingTimer = disconnectTimers.get(timerKey);
-  if (existingTimer) clearTimeout(existingTimer);
+  // (gameId, userId). Clearing the existing timer first guarantees at most
+  // one pending forfeit timer per (gameId, userId) and makes repeated
+  // disconnects simply restart the grace window, which is also the right
+  // user-facing behavior.
+  const existing = disconnectTimers.get(timerKey);
+  if (existing) clearTimeout(existing.timer);
 
+  const version = ++nextDisconnectVersion;
   const timer = setTimeout(() => {
     // Fire-and-forget, same discipline as the question-timeout timer above:
     // forfeitIfStillDisconnected is async and this callback isn't awaited by
     // anything, so an unhandled rejection here would crash the process.
-    forfeitIfStillDisconnected(gameId, userId).catch((err) => {
+    forfeitIfStillDisconnected(gameId, userId, version).catch((err) => {
       console.error(`gameEngine: failed to process forfeit for game ${gameId}, user ${userId}`, err);
     });
   }, RECONNECT_GRACE_MS);
-  disconnectTimers.set(timerKey, timer);
+  disconnectTimers.set(timerKey, { timer, version });
 }
 
-export async function handleReconnect(gameId: string, userId: number, newSocketId: string): Promise<boolean> {
+export async function handleReconnect(gameId: string, userId: number, newSocketId: string): Promise<GameState | null> {
   const game = await getGame(gameId);
-  if (!game || game.status !== 'active') return false;
+  if (!game || game.status !== 'active') return null;
   const player = game.players.find((p) => p.userId === userId);
-  if (!player) return false;
+  if (!player) return null;
 
   player.socketId = newSocketId;
   player.disconnectedAt = undefined;
   await saveGame(game);
 
+  // Clear whatever timer is currently registered for this key. saveGame()
+  // above just wrote disconnectedAt = undefined, so no forfeit timer should
+  // be left pending for this player regardless of which disconnect it
+  // originally belonged to - if a newer disconnect raced ahead of this
+  // reconnect and is still genuinely in effect, its own handleDisconnect call
+  // is the one that wrote the last disconnectedAt value into Redis (RMW: last
+  // saveGame wins), not this one, so there's nothing to reconcile here. The
+  // version check in forfeitIfStillDisconnected below is what actually
+  // guarantees correctness even if this ends up clearing a timer that another
+  // in-flight disconnect/reconnect call still thinks is "theirs" - a cleared
+  // timer callback simply never runs, and a callback that isn't cleared but
+  // has since been superseded is a no-op because its version no longer
+  // matches the map.
   const timerKey = `${gameId}:${userId}`;
-  const timer = disconnectTimers.get(timerKey);
-  if (timer) {
-    clearTimeout(timer);
+  const existing = disconnectTimers.get(timerKey);
+  if (existing) {
+    clearTimeout(existing.timer);
     disconnectTimers.delete(timerKey);
   }
-  return true;
+  return game;
 }
 
-async function forfeitIfStillDisconnected(gameId: string, userId: number): Promise<void> {
+async function forfeitIfStillDisconnected(gameId: string, userId: number, version: number): Promise<void> {
   const timerKey = `${gameId}:${userId}`;
+  const current = disconnectTimers.get(timerKey);
+  // A newer disconnect (or a reconnect) has superseded this callback's timer
+  // since it was scheduled - it's no longer the current/authoritative one for
+  // this key, so it must not act. This is exactly what prevents the
+  // lost-forfeit race described above.
+  if (!current || current.version !== version) return;
   disconnectTimers.delete(timerKey);
   const game = await getGame(gameId);
   if (!game || game.status !== 'active') return;
@@ -265,8 +306,12 @@ async function forfeitIfStillDisconnected(gameId: string, userId: number): Promi
   // non-active game and safely no-ops. A true simultaneous forfeit-and-finish
   // could in the worst case double-call recordMatchResult - the same
   // MVP-acceptable tradeoff already made elsewhere in this file.
+  // Matches finishGame()'s cleanup exactly (clear AND remove the map entry,
+  // not just clearTimeout) so no stale handle for this gameId lingers in
+  // activeTimers after the match ends via forfeit.
   const timer = activeTimers.get(gameId);
   if (timer) clearTimeout(timer);
+  activeTimers.delete(gameId);
 
   game.status = 'finished';
   await saveGame(game);

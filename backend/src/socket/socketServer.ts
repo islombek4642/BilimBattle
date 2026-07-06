@@ -2,7 +2,6 @@ import { Server, Socket } from 'socket.io';
 import { createServer } from 'http';
 import { verifySession } from '../auth/jwt';
 import { submitAnswer, handleDisconnect, handleReconnect } from '../game/gameEngine';
-import { getGame } from '../game/gameState';
 import { handleJoinQueue, cancelWaiting } from '../matchmaking/matchmaker';
 
 export interface SocketData {
@@ -69,18 +68,31 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     });
 
     socket.on('reconnect_game', async ({ gameId }: { gameId: string }, ack: (state: unknown) => void) => {
-      const reconnected = await handleReconnect(gameId, socket.data.userId, socket.id);
-      if (!reconnected) {
+      // A client that emits this event with no ack callback (buggy client,
+      // or an old client build) would otherwise crash this handler on
+      // `ack(...)` below ("ack is not a function") - there's no global
+      // unhandledRejection handler in this backend, so that's a real
+      // process-crash vector, not just a logged error.
+      if (typeof ack !== 'function') return;
+
+      // handleReconnect returns the GameState directly (or null) instead of
+      // a boolean specifically so we don't need a second getGame() call here.
+      // A second fetch would have its own gap between handleReconnect's
+      // internal saveGame and this handler's own read - if the game
+      // finishes/forfeits in that gap, getGame() would return null and
+      // `game!.currentQuestionIndex` below would throw inside this
+      // unwrapped async handler.
+      const game = await handleReconnect(gameId, socket.data.userId, socket.id);
+      if (!game) {
         ack({ found: false });
         return;
       }
       socket.join(gameId);
       socket.data.gameId = gameId;
-      const game = await getGame(gameId);
       ack({
         found: true,
-        currentQuestionIndex: game!.currentQuestionIndex,
-        scores: game!.players.map((p) => ({ userId: p.userId, score: p.score })),
+        currentQuestionIndex: game.currentQuestionIndex,
+        scores: game.players.map((p) => ({ userId: p.userId, score: p.score })),
       });
     });
 
