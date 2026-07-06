@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { createServer } from 'http';
 import { verifySession } from '../auth/jwt';
+import { submitAnswer } from '../game/gameEngine';
 
 export interface SocketData {
   userId: number;
@@ -51,6 +52,10 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
 
   io.on('connection', (socket: AppSocket) => {
     trackActiveSocket(io!, socket, socket.data.userId);
+
+    socket.on('submit_answer', async ({ gameId, selectedOption }: { gameId: string; selectedOption: number }) => {
+      await submitAnswer(gameId, socket.data.userId, selectedOption);
+    });
   });
 
   return io;
