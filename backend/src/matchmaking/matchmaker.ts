@@ -6,6 +6,13 @@ import { isValidCategory } from '../questions/questionRepository';
 import { getOrCreateBotUser } from '../users/userRepository';
 
 const BOT_MATCH_TIMEOUT_MS = 15_000;
+// Tracks users currently waiting in a queue (joined, not yet paired), keyed
+// by userId, so their bot-fallback timer can be found and cancelled on a
+// real pairing or an explicit leave_queue. handleJoinQueue guards against a
+// duplicate join for a user already present here (see below), so — unlike
+// gameEngine.ts's activeTimers — an entry can't be silently orphaned by a
+// double-join; it's always removed by exactly one of: a real pairing, an
+// explicit cancelWaiting, or the bot-timeout callback itself firing.
 const waitingTimers = new Map<number, NodeJS.Timeout>();
 
 // Per-category serialization for every operation that touches the queue's
@@ -42,13 +49,18 @@ function runSerialized<T>(category: string, fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
-export interface QueueParticipant {
-  userId: number;
-  socketId: string;
-}
-
 export async function handleJoinQueue(io: AppServer, socketId: string, userId: number, category: string): Promise<void> {
   if (!isValidCategory(category)) return;
+
+  // Idempotency guard: a duplicate join_queue call (double-tap, client
+  // retry) for a user already waiting must be ignored. Without this,
+  // waitingTimers.set(userId, timer) below would silently overwrite the
+  // first timer's map entry without clearing its underlying setTimeout (the
+  // stray timer fires later and deletes the SECOND timer's map entry
+  // instead of its own), and joinQueue would push a second Redis entry for
+  // the same user, letting popTwoIfAvailable return [thisUser, thisUser] —
+  // a user matched against themselves.
+  if (waitingTimers.has(userId)) return;
 
   const pair = await runSerialized(category, async () => {
     await joinQueue(category, { userId, socketId });
@@ -80,6 +92,8 @@ export async function handleJoinQueue(io: AppServer, socketId: string, userId: n
       if (!removed) return;
       const bot = await getOrCreateBotUser();
       await createMatch(io, category, { userId, socketId }, { userId: bot.id, socketId: 'bot' }, true);
+    }).catch((err) => {
+      console.error('matchmaker: bot-fallback match failed', err);
     });
   }, BOT_MATCH_TIMEOUT_MS);
   waitingTimers.set(userId, timer);
@@ -94,7 +108,9 @@ export async function handleJoinQueue(io: AppServer, socketId: string, userId: n
 // to call at any point in a player's queue lifecycle, matched or not.
 export function cancelWaiting(userId: number, category: string): void {
   clearWaitingTimer(userId);
-  void runSerialized(category, () => leaveQueue(category, userId));
+  runSerialized(category, () => leaveQueue(category, userId)).catch((err) => {
+    console.error('matchmaker: failed to leave queue', err);
+  });
 }
 
 function clearWaitingTimer(userId: number): void {
