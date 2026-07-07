@@ -19,4 +19,9 @@ describe('PrimaryButton', () => {
     render(<PrimaryButton disabled>Band</PrimaryButton>);
     expect(screen.getByRole('button', { name: 'Band' })).toBeDisabled();
   });
+
+  it('appends a caller-provided className to the default classes', () => {
+    render(<PrimaryButton className="mt-4">Test</PrimaryButton>);
+    expect(screen.getByRole('button', { name: 'Test' })).toHaveClass('mt-4', 'bg-blue-600');
+  });
 });
