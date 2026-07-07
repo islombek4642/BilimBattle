@@ -95,4 +95,61 @@ describe('gameEngine full match flow', () => {
       await submitAnswer(gameId, player2Id, 1);
     }
   });
+
+  it('still cleans up the game from Redis when recordMatchResult fails (e.g. an FK violation from a bogus userId)', async () => {
+    const { fakeIO, events } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    // No corresponding row in `users` for this id, so the `matches` table's
+    // FK constraint on player2_id rejects the INSERT inside recordMatchResult
+    // - the same failure mode the Task 24 load test hit for real (a caller
+    // passing a userId that didn't correspond to an actual users row).
+    const bogusUserId = 999_999_999;
+
+    // persistMatchResult() is expected to console.error the failure - silence
+    // it here so the test output isn't misread as an unhandled crash, while
+    // still asserting on it below to confirm the failure was actually logged
+    // (not silently swallowed with no trace).
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const gameId = randomUUID();
+    await startGame(
+      gameId,
+      'umumiy_bilim',
+      { userId: player1Id, socketId: 'sock1' },
+      { userId: bogusUserId, socketId: 'sock2' }
+    );
+
+    for (let i = 0; i < 7; i += 1) {
+      await submitAnswer(gameId, player1Id, 0);
+      await submitAnswer(gameId, bogusUserId, 1);
+    }
+
+    // The match still completed from the clients' point of view...
+    const gameOverEvent = events.find((e) => e.event === 'game_over');
+    expect(gameOverEvent).toBeDefined();
+
+    // ...recordMatchResult's failure was logged with enough context to
+    // reconstruct the match manually (not silently dropped)...
+    const failureLog = errorSpy.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('recordMatchResult FAILED')
+    );
+    expect(failureLog).toBeDefined();
+    expect(failureLog![0]).toContain(gameId);
+    expect(failureLog![0]).toContain(String(bogusUserId));
+
+    // ...no match row was persisted (the write genuinely failed)...
+    const matchRow = await pool.query(
+      `SELECT * FROM matches WHERE player1_id = $1 AND player2_id = $2`,
+      [player1Id, bogusUserId]
+    );
+    expect(matchRow.rows.length).toBe(0);
+
+    // ...and, critically, the game was still removed from Redis instead of
+    // being left stranded in a "finished" state until the 30-minute TTL.
+    const gameAfter = await getGame(gameId);
+    expect(gameAfter).toBeNull();
+
+    errorSpy.mockRestore();
+  });
 });

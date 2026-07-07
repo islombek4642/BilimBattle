@@ -142,6 +142,39 @@ async function resolveQuestion(gameId: string): Promise<void> {
   await sendNextQuestion(gameId);
 }
 
+// recordMatchResult() runs strictly AFTER the game_over event has already
+// been emitted to clients (both callers below emit first). If it throws - a
+// transient Postgres error, pool exhaustion, or - as actually happened during
+// the Task 24 load test - a caller's userId not corresponding to a real
+// `users` row, tripping the `matches` table's FK constraint - that must not
+// stop deleteGame() from running afterward. Clients already believe the match
+// is over; leaving the Redis key around wouldn't undo that belief, it would
+// just leave stale "finished" game state occupying Redis for up to
+// GAME_TTL_SECONDS on top of the match record being lost. So this is
+// deliberately swallow-and-log rather than swallow-and-retry: there's no
+// retry queue at this MVP stage, and keeping the game "alive" in Redis just
+// to retry a DB write later would leave clients who were already told
+// game_over stuck in limbo for no benefit - the match is over either way. The
+// error log carries every field needed to hand-reconstruct and manually
+// re-insert the match later (gameId, category, both player IDs/scores,
+// winnerId) since there is currently no automated way to recover it.
+async function persistMatchResult(
+  gameId: string,
+  params: Parameters<typeof recordMatchResult>[0]
+): Promise<void> {
+  try {
+    await recordMatchResult(params);
+  } catch (err) {
+    console.error(
+      `gameEngine: recordMatchResult FAILED for game ${gameId} - match result was NOT persisted ` +
+        `(clients were already told the game is over). Context for manual recovery: ` +
+        `category=${params.category}, player1Id=${params.player1Id}, player1Score=${params.player1Score}, ` +
+        `player2Id=${params.player2Id}, player2Score=${params.player2Score}, winnerId=${params.winnerId}`,
+      err
+    );
+  }
+}
+
 async function finishGame(gameId: string): Promise<void> {
   const game = await getGame(gameId);
   if (!game) return;
@@ -155,7 +188,7 @@ async function finishGame(gameId: string): Promise<void> {
     winnerId,
   });
 
-  await recordMatchResult({
+  await persistMatchResult(gameId, {
     category: game.category,
     player1Id: p1.userId,
     player2Id: p2.userId,
@@ -322,7 +355,7 @@ async function forfeitIfStillDisconnected(gameId: string, userId: number, versio
     forfeited: true,
   });
 
-  await recordMatchResult({
+  await persistMatchResult(gameId, {
     category: game.category,
     player1Id: game.players[0].userId,
     player2Id: game.players[1].userId,
