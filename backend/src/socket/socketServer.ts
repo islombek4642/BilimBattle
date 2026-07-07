@@ -2,7 +2,9 @@ import { Server, Socket } from 'socket.io';
 import { createServer } from 'http';
 import { verifySession } from '../auth/jwt';
 import { submitAnswer, handleDisconnect, handleReconnect } from '../game/gameEngine';
-import { handleJoinQueue, cancelWaiting } from '../matchmaking/matchmaker';
+import { handleJoinQueue, cancelWaiting, createMatch } from '../matchmaking/matchmaker';
+import { createInvite, consumeInvite } from '../invite/inviteRoom';
+import { isValidCategory } from '../questions/questionRepository';
 
 export interface SocketData {
   userId: number;
@@ -65,6 +67,50 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
 
     socket.on('leave_queue', ({ category }: { category: string }) => {
       cancelWaiting(socket.data.userId, category);
+    });
+
+    // Fire-and-forget from Node's perspective: Socket.io invokes this async
+    // handler but never awaits or catches its returned promise (that only
+    // happens for emits that use an ack callback, which this event doesn't).
+    // An unhandled rejection here (e.g. Redis blip inside createInvite) would
+    // otherwise crash the process, same hazard already noted on the
+    // 'disconnect' handler below - so this is wrapped in .catch() too.
+    socket.on('create_invite', ({ category }: { category: string }) => {
+      if (!isValidCategory(category)) return;
+      const telegramId = socket.data.telegramId;
+      createInvite(telegramId, { category, socketId: socket.id, userId: socket.data.userId })
+        .then(() => socket.emit('invite_created'))
+        .catch((err) => {
+          console.error(`socketServer: failed to create invite for telegramId ${telegramId}`, err);
+        });
+    });
+
+    // Same fire-and-forget hazard as create_invite above - wrapped in .catch().
+    // Note: the invitee's own `category` here is intentionally NOT forwarded
+    // to createMatch. The match is played in the category the INVITER
+    // originally queued for (invite.category, stored server-side when the
+    // invite was created) - the invitee joining via a deep link doesn't get
+    // to silently redirect the match to a different category. We still
+    // validate the invitee's category so a malformed/garbage payload is
+    // rejected up front, but it otherwise carries no weight in this handler.
+    socket.on('join_invite', ({ inviterTelegramId, category }: { inviterTelegramId: number; category: string }) => {
+      if (!isValidCategory(category)) return;
+      consumeInvite(inviterTelegramId)
+        .then(async (invite) => {
+          if (!invite) {
+            socket.emit('invite_expired');
+            return;
+          }
+          await createMatch(
+            io!,
+            invite.category,
+            { userId: invite.userId, socketId: invite.socketId },
+            { userId: socket.data.userId, socketId: socket.id }
+          );
+        })
+        .catch((err) => {
+          console.error(`socketServer: failed to join invite from inviterTelegramId ${inviterTelegramId}`, err);
+        });
     });
 
     socket.on('reconnect_game', async ({ gameId }: { gameId: string }, ack: (state: unknown) => void) => {
