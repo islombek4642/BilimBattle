@@ -10,6 +10,11 @@ const httpServer = createServer(app);
 initSocketServer(httpServer);
 startTelegramBot();
 
+httpServer.on('error', (err) => {
+  console.error('Server failed to start:', err);
+  process.exit(1);
+});
+
 httpServer.listen(env.port, () => {
   console.log(`BilimBattle backend ${env.port}-portda ishga tushdi`);
 });

@@ -5,6 +5,7 @@ import { submitAnswer, handleDisconnect, handleReconnect } from '../game/gameEng
 import { handleJoinQueue, cancelWaiting, createMatch } from '../matchmaking/matchmaker';
 import { createInvite, consumeInvite } from '../invite/inviteRoom';
 import { isValidCategory } from '../questions/questionRepository';
+import { env } from '../config/env';
 
 export interface SocketData {
   userId: number;
@@ -36,7 +37,7 @@ function trackActiveSocket(io: AppServer, socket: AppSocket, userId: number): vo
 
 export function initSocketServer(httpServer: ReturnType<typeof createServer>): AppServer {
   activeSocketsByUser = new Map<number, string>();
-  io = new Server<any, any, any, SocketData>(httpServer, { cors: { origin: '*' } });
+  io = new Server<any, any, any, SocketData>(httpServer, { cors: { origin: env.webappUrl } });
 
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token as string | undefined;
