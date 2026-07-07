@@ -23,4 +23,5 @@ export const env = {
   redisUrl: required('REDIS_URL'),
   jwtSecret: required('JWT_SECRET'),
   telegramBotToken: required('TELEGRAM_BOT_TOKEN'),
+  webappUrl: required('WEBAPP_URL'),
 };

@@ -15,6 +15,7 @@ describe('env config', () => {
     process.env.REDIS_URL = 'redis://localhost:6379';
     process.env.JWT_SECRET = 'secret';
     process.env.TELEGRAM_BOT_TOKEN = 'token';
+    process.env.WEBAPP_URL = 'https://example.com';
     expect(() => require('../../src/config/env')).toThrow(
       'Missing required environment variable: DATABASE_URL'
     );
@@ -25,6 +26,7 @@ describe('env config', () => {
     process.env.REDIS_URL = 'redis://localhost:6379';
     process.env.JWT_SECRET = 'secret';
     process.env.TELEGRAM_BOT_TOKEN = 'token';
+    process.env.WEBAPP_URL = 'https://example.com';
     process.env.PORT = '4000';
     const { env } = require('../../src/config/env');
     expect(env.port).toBe(4000);
