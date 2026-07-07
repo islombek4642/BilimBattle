@@ -20,6 +20,8 @@ interface NavigationContextValue {
   reset: (screen: Screen) => void;
 }
 
+const SCREENS_WITHOUT_BACK_BUTTON = new Set<Screen['name']>(['battle']);
+
 const NavigationContext = createContext<NavigationContextValue | null>(null);
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
@@ -47,16 +49,21 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     const webApp = getTelegramWebApp();
     if (!webApp) return;
 
-    const shouldShowBack = stack.length > 1 && current.name !== 'battle';
+    const shouldShowBack = stack.length > 1 && !SCREENS_WITHOUT_BACK_BUTTON.has(current.name);
     if (shouldShowBack) {
       webApp.BackButton.show();
     } else {
       webApp.BackButton.hide();
     }
+  }, [stack.length, current.name]);
+
+  useEffect(() => {
+    const webApp = getTelegramWebApp();
+    if (!webApp) return;
 
     webApp.BackButton.onClick(goBack);
     return () => webApp.BackButton.offClick(goBack);
-  }, [stack.length, current.name, goBack]);
+  }, [goBack]);
 
   return (
     <NavigationContext.Provider value={{ current, navigate, goBack, replace, reset }}>
