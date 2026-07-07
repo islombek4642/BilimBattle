@@ -73,6 +73,12 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
 
     // Same fire-and-forget hazard as submit_answer above - wrapped in .catch().
     socket.on('join_queue', ({ category }: { category: string }) => {
+      // Refuse to queue this socket while it's already in an active game -
+      // otherwise a stray join_queue mid-match would pair this user into a
+      // second concurrent match, silently overwriting socket.data.gameId and
+      // leaving the first game's disconnect/reconnect bookkeeping pointing
+      // at the wrong game. Same guard as create_invite/join_invite below.
+      if (socket.data.gameId) return;
       handleJoinQueue(io!, socket.id, socket.data.userId, category).catch((err) => {
         console.error(`socketServer: failed to join queue for user ${socket.data.userId}`, err);
       });
