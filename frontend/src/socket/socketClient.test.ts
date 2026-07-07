@@ -1,3 +1,4 @@
+// frontend/src/socket/socketClient.test.ts
 import { describe, it, expect, vi } from 'vitest';
 import { io } from 'socket.io-client';
 import { createSocket } from './socketClient';
