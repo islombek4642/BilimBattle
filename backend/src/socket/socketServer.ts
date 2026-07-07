@@ -58,12 +58,24 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
   io.on('connection', (socket: AppSocket) => {
     trackActiveSocket(io!, socket, socket.data.userId);
 
-    socket.on('submit_answer', async ({ gameId, questionIndex, selectedOption }: { gameId: string; questionIndex: number; selectedOption: number }) => {
-      await submitAnswer(gameId, socket.data.userId, selectedOption, questionIndex);
+    // Same fire-and-forget hazard as create_invite/join_invite below - Socket.io
+    // never awaits or catches a listener's returned promise, and there's no
+    // global unhandledRejection handler in this backend. This is the hottest
+    // path in the whole game (every answer submission from every active match
+    // goes through it), so a transient Redis/Postgres error here is ordinary
+    // operational noise, not an edge case - left unhandled it would crash the
+    // entire process and kill every concurrent match, not just this one.
+    socket.on('submit_answer', ({ gameId, questionIndex, selectedOption }: { gameId: string; questionIndex: number; selectedOption: number }) => {
+      submitAnswer(gameId, socket.data.userId, selectedOption, questionIndex).catch((err) => {
+        console.error(`socketServer: failed to submit answer for game ${gameId}`, err);
+      });
     });
 
-    socket.on('join_queue', async ({ category }: { category: string }) => {
-      await handleJoinQueue(io!, socket.id, socket.data.userId, category);
+    // Same fire-and-forget hazard as submit_answer above - wrapped in .catch().
+    socket.on('join_queue', ({ category }: { category: string }) => {
+      handleJoinQueue(io!, socket.id, socket.data.userId, category).catch((err) => {
+        console.error(`socketServer: failed to join queue for user ${socket.data.userId}`, err);
+      });
     });
 
     socket.on('leave_queue', ({ category }: { category: string }) => {
@@ -144,7 +156,13 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
         });
     });
 
-    socket.on('reconnect_game', async ({ gameId }: { gameId: string }, ack: (state: unknown) => void) => {
+    // Not `async (...) => {}` - same fire-and-forget hazard as submit_answer/
+    // join_queue/create_invite/join_invite above: Socket.io never awaits or
+    // catches a listener's returned promise, and there's no global
+    // unhandledRejection handler in this backend. The async work is kicked
+    // off as a promise chain terminated in .catch() instead, so a rejection
+    // out of handleReconnect can't take down the process.
+    socket.on('reconnect_game', ({ gameId }: { gameId: string }, ack: (state: unknown) => void) => {
       // A client that emits this event with no ack callback (buggy client,
       // or an old client build) would otherwise crash this handler on
       // `ack(...)` below ("ack is not a function") - there's no global
@@ -157,20 +175,24 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
       // A second fetch would have its own gap between handleReconnect's
       // internal saveGame and this handler's own read - if the game
       // finishes/forfeits in that gap, getGame() would return null and
-      // `game!.currentQuestionIndex` below would throw inside this
-      // unwrapped async handler.
-      const game = await handleReconnect(gameId, socket.data.userId, socket.id);
-      if (!game) {
-        ack({ found: false });
-        return;
-      }
-      socket.join(gameId);
-      socket.data.gameId = gameId;
-      ack({
-        found: true,
-        currentQuestionIndex: game.currentQuestionIndex,
-        scores: game.players.map((p) => ({ userId: p.userId, score: p.score })),
-      });
+      // `game!.currentQuestionIndex` below would throw inside this handler.
+      handleReconnect(gameId, socket.data.userId, socket.id)
+        .then((game) => {
+          if (!game) {
+            ack({ found: false });
+            return;
+          }
+          socket.join(gameId);
+          socket.data.gameId = gameId;
+          ack({
+            found: true,
+            currentQuestionIndex: game.currentQuestionIndex,
+            scores: game.players.map((p) => ({ userId: p.userId, score: p.score })),
+          });
+        })
+        .catch((err) => {
+          console.error(`socketServer: failed to reconnect game ${gameId}`, err);
+        });
     });
 
     // Separate from trackActiveSocket's own 'disconnect' listener (which only
