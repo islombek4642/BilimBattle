@@ -1,3 +1,4 @@
+// frontend/src/utils/score.ts
 import { ScoreEntry } from '../api/types';
 
 export function findMyScore(scores: ScoreEntry[], myUserId: number): number {

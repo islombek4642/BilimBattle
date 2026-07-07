@@ -1,3 +1,4 @@
+// frontend/src/utils/score.test.ts
 import { describe, it, expect } from 'vitest';
 import { findMyScore, findOpponentScore } from './score';
 

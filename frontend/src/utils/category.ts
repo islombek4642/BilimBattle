@@ -1,3 +1,4 @@
+// frontend/src/utils/category.ts
 // Mirrors backend/src/questions/questionRepository.ts's CATEGORIES array.
 // Keep in sync manually if a category is ever added/renamed there — this
 // table has no compile-time or runtime link to the live GET /categories data.

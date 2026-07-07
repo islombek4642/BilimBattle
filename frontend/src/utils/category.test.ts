@@ -1,3 +1,4 @@
+// frontend/src/utils/category.test.ts
 import { describe, it, expect } from 'vitest';
 import { categoryLabel } from './category';
 
