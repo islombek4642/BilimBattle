@@ -66,4 +66,13 @@ describe('api/client', () => {
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(500);
   });
+
+  it('wraps a network failure (fetch rejecting) into an ApiError with status 0', async () => {
+    (fetch as any).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const error = await apiGet('/anything').catch((e) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(0);
+  });
 });

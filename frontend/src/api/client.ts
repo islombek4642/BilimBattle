@@ -11,19 +11,29 @@ export class ApiError extends Error {
   }
 }
 
+interface ErrorBody {
+  error?: unknown;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
+  const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
+  if (options.body) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  } catch {
+    throw new ApiError(0, 'Tarmoq xatosi');
+  }
 
   const body = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new ApiError(res.status, body.error ?? "Noma'lum xatolik yuz berdi");
+    const errorBody = body as ErrorBody;
+    const message = typeof errorBody.error === 'string' ? errorBody.error : "Noma'lum xatolik yuz berdi";
+    throw new ApiError(res.status, message);
   }
 
   return body as T;
