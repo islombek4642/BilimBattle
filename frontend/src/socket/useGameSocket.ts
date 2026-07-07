@@ -35,6 +35,30 @@ export interface ReconnectAck {
   scores?: ScoreEntry[];
 }
 
+// Socket.io's own built-in lifecycle events ('connect'/'disconnect') are
+// intentionally left out of this map - the base `Socket` class already types
+// them internally, and redeclaring them here with no-arg signatures is
+// unnecessary (and, depending on the socket.io-client version, can conflict
+// with its own internal overloads for those two event names).
+export interface ServerToClientEvents {
+  match_found: (payload: MatchFoundPayload) => void;
+  question: (payload: QuestionPayload) => void;
+  question_result: (payload: QuestionResultPayload) => void;
+  game_over: (payload: GameOverPayload) => void;
+  session_replaced: () => void;
+  invite_created: () => void;
+  invite_expired: () => void;
+}
+
+export interface ClientToServerEvents {
+  join_queue: (payload: { category: string }) => void;
+  leave_queue: (payload: { category: string }) => void;
+  submit_answer: (payload: { gameId: string; questionIndex: number; selectedOption: number }) => void;
+  create_invite: (payload: { category: string }) => void;
+  join_invite: (payload: { inviterTelegramId: number; category: string }) => void;
+  reconnect_game: (payload: { gameId: string }, ack: (response: ReconnectAck) => void) => void;
+}
+
 export interface UseGameSocketResult {
   connected: boolean;
   matchFound: MatchFoundPayload | null;
@@ -57,8 +81,10 @@ export interface UseGameSocketResult {
   clearInviteExpired: () => void;
 }
 
+type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+
 export function useGameSocket(token: string | null): UseGameSocketResult {
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<GameSocket | null>(null);
   // Bumped every time the effect tears down (unmount, or `token` changing).
   // reconnectGame's ack callback closes over the value that was current when
   // the emit was issued and refuses to resolve the promise if the ref has

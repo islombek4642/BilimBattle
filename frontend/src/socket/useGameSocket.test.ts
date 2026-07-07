@@ -144,4 +144,28 @@ describe('useGameSocket', () => {
     unmount();
     expect(fakeSocket.disconnect).toHaveBeenCalledOnce();
   });
+
+  it('does not resolve reconnectGame if the component unmounts before the ack arrives', async () => {
+    const { result, unmount } = renderHook(() => useGameSocket('tok'));
+
+    let capturedAck: ((response: any) => void) | undefined;
+    fakeSocket.emit.mockImplementation((event: string, _payload: any, ack: any) => {
+      if (event === 'reconnect_game') {
+        capturedAck = ack;
+      }
+    });
+
+    const promise = result.current.reconnectGame('game-1');
+    unmount();
+
+    // Ack arrives AFTER unmount — should be a no-op, not resolve the promise.
+    capturedAck?.({ found: true, currentQuestionIndex: 3, scores: [] });
+
+    const resolved = await Promise.race([
+      promise.then(() => 'resolved'),
+      new Promise((resolve) => setTimeout(() => resolve('timeout'), 50)),
+    ]);
+
+    expect(resolved).toBe('timeout');
+  });
 });
