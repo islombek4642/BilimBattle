@@ -2,20 +2,14 @@
   "name": "frontend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
-  "directories": {
-    "test": "tests"
-  },
+  "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "dependencies": {
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
