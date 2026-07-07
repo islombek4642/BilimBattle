@@ -1,6 +1,7 @@
 // frontend/src/context/AuthContext.tsx
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { login } from '../api/auth';
+import { ApiError } from '../api/client';
 import { getInitData, getStartParam } from '../telegram/webApp';
 import { User } from '../api/types';
 
@@ -32,8 +33,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(res.token);
         setUser(res.user);
       })
-      .catch(() => {
-        setError('Tizimga kirishda xatolik yuz berdi');
+      .catch((err) => {
+        console.error(err);
+        if (err instanceof ApiError && err.status === 0) {
+          setError("Internetga ulanishda xatolik. Qayta urinib ko'ring.");
+        } else {
+          setError('Tizimga kirishda xatolik yuz berdi');
+        }
       })
       .finally(() => {
         setLoading(false);

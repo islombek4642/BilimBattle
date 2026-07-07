@@ -4,6 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from './AuthContext';
 import * as authApi from '../api/auth';
 import * as telegram from '../telegram/webApp';
+import { ApiError } from '../api/client';
 
 function Consumer() {
   const { loading, error, token, user } = useAuth();
@@ -65,5 +66,19 @@ describe('AuthContext', () => {
     );
 
     await waitFor(() => expect(screen.getByText(/error:/)).toBeInTheDocument());
+  });
+
+  it('shows a network-specific error when login fails due to a network failure (ApiError status 0)', async () => {
+    vi.spyOn(telegram, 'getInitData').mockReturnValue('raw-init-data');
+    vi.spyOn(telegram, 'getStartParam').mockReturnValue(undefined);
+    vi.spyOn(authApi, 'login').mockRejectedValue(new ApiError(0, 'Tarmoq xatosi'));
+
+    render(
+      <AuthProvider>
+        <Consumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => expect(screen.getByText(/Internetga ulanishda xatolik/)).toBeInTheDocument());
   });
 });
