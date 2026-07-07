@@ -1,1 +1,19 @@
+/*
+ * No tailwind.config.js in this project (intentional, not an oversight).
+ * Tailwind v4's automatic content detection scans src/**\/* on its own and
+ * covers everything this plan needs (plain utility classes only - no custom
+ * colors/spacing/fonts anywhere in the 30-task plan). A JS config file is
+ * NOT loaded automatically in v4 - it only takes effect via an explicit
+ * `@config "./tailwind.config.js";` at-rule here, which is easy to forget
+ * and produces no error/warning when missing (config silently does
+ * nothing). If a future task needs custom theme tokens, add an `@theme {}`
+ * block below instead of reviving a JS config file.
+ *
+ * Also note: v4 changed some utility defaults vs v3 - bare `border` no
+ * longer defaults to gray (currentColor now), and bare `ring` is 1px
+ * currentColor instead of v3's 3px blue. Not an issue yet since no task
+ * uses bare `border`/`ring`, but be aware if writing ad-hoc styles beyond
+ * the plan - always pass an explicit color/width (e.g. `border-gray-300`,
+ * `ring-2 ring-blue-500`).
+ */
 @import "tailwindcss";
