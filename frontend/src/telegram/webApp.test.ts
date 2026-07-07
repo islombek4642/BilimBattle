@@ -11,7 +11,6 @@ import {
 
 describe('telegram/webApp', () => {
   beforeEach(() => {
-    // @ts-expect-error - test-only cleanup of the global
     delete window.Telegram;
   });
 
