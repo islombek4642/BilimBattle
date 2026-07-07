@@ -20,4 +20,14 @@ describe('inviteRoom', () => {
     const second = await consumeInvite(12345);
     expect(second).toBeNull();
   });
+
+  it('only allows exactly one of two concurrent consumers to win', async () => {
+    await createInvite(54321, { category: 'tarix', socketId: 'sockB', userId: 2 });
+
+    const [resultA, resultB] = await Promise.all([consumeInvite(54321), consumeInvite(54321)]);
+
+    const nonNullResults = [resultA, resultB].filter((r) => r !== null);
+    expect(nonNullResults).toHaveLength(1);
+    expect(nonNullResults[0]).toEqual({ category: 'tarix', socketId: 'sockB', userId: 2 });
+  });
 });
