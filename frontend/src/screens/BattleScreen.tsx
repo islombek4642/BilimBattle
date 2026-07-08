@@ -96,6 +96,7 @@ export function BattleScreen({ gameId }: { gameId: string }) {
           return (
             <button
               key={index}
+              type="button"
               disabled={selectedOption !== null}
               onClick={() => handleSelect(index)}
               className={`rounded-lg py-3 font-medium ${

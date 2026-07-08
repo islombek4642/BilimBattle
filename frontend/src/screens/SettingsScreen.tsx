@@ -11,9 +11,13 @@ export function SettingsScreen() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(
-    () => localStorage.getItem(SOUND_KEY) !== 'false'
-  );
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SOUND_KEY) !== 'false';
+    } catch {
+      return true;
+    }
+  });
 
   useEffect(() => {
     if (!token) return;
@@ -44,7 +48,12 @@ export function SettingsScreen() {
   const toggleSound = () => {
     const next = !soundEnabled;
     setSoundEnabled(next);
-    localStorage.setItem(SOUND_KEY, String(next));
+    try {
+      localStorage.setItem(SOUND_KEY, String(next));
+    } catch {
+      // Storage unavailable (private mode, restricted WebView) - preference
+      // just won't persist across sessions; not worth surfacing to the user.
+    }
   };
 
   return (
@@ -54,6 +63,7 @@ export function SettingsScreen() {
         <span>Ovoz/Vibratsiya</span>
         <button
           type="button"
+          aria-pressed={soundEnabled}
           className={`rounded-full px-4 py-1 font-semibold ${
             soundEnabled ? 'bg-blue-600 text-white' : 'bg-gray-200'
           }`}
