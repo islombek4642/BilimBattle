@@ -52,4 +52,26 @@ describe('LeaderboardScreen', () => {
     await waitFor(() => expect(screen.getByText(/Other/)).toBeInTheDocument());
     expect(screen.queryByText(/Sizning o'rningiz/)).not.toBeInTheDocument();
   });
+
+  it('shows a loading state while the leaderboard is being fetched', async () => {
+    let resolveLeaderboard: (value: { leaderboard: any[] }) => void;
+    vi.spyOn(leaderboardApi, 'getGlobalLeaderboard').mockReturnValue(
+      new Promise((resolve) => { resolveLeaderboard = resolve; })
+    );
+
+    render(<LeaderboardScreen />);
+
+    expect(screen.getByText(/Yuklanmoqda/)).toBeInTheDocument();
+
+    resolveLeaderboard!({ leaderboard: [] });
+    await waitFor(() => expect(screen.queryByText(/Yuklanmoqda/)).not.toBeInTheDocument());
+  });
+
+  it('shows an error message when the leaderboard fails to load', async () => {
+    vi.spyOn(leaderboardApi, 'getGlobalLeaderboard').mockRejectedValue(new Error('network down'));
+
+    render(<LeaderboardScreen />);
+
+    await waitFor(() => expect(screen.getByText(/Reytingni yuklab bo'lmadi/)).toBeInTheDocument());
+  });
 });

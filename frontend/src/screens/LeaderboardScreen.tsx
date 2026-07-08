@@ -46,6 +46,7 @@ export function LeaderboardScreen() {
       <div className="flex gap-2">
         <button
           type="button"
+          aria-current={tab === 'global' ? 'page' : undefined}
           className={`flex-1 rounded-lg py-2 font-semibold ${
             tab === 'global' ? 'bg-blue-600 text-white' : 'bg-gray-100'
           }`}
@@ -55,6 +56,7 @@ export function LeaderboardScreen() {
         </button>
         <button
           type="button"
+          aria-current={tab === 'friends' ? 'page' : undefined}
           className={`flex-1 rounded-lg py-2 font-semibold ${
             tab === 'friends' ? 'bg-blue-600 text-white' : 'bg-gray-100'
           }`}
