@@ -24,4 +24,8 @@ export const env = {
   jwtSecret: required('JWT_SECRET'),
   telegramBotToken: required('TELEGRAM_BOT_TOKEN'),
   webappUrl: required('WEBAPP_URL'),
+  // Optional: the /admin/stats dashboard responds 503 (not a hard boot
+  // failure) when this is unset, so existing deployments that predate the
+  // dashboard don't need to add it just to keep running.
+  adminPassword: process.env.ADMIN_PASSWORD,
 };

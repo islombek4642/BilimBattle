@@ -53,6 +53,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - WEBAPP_URL=https://${WEBAPP_DOMAIN}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - TZ=Asia/Tashkent
       - VIRTUAL_HOST=${API_DOMAIN}
       - VIRTUAL_PORT=3000
