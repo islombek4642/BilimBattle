@@ -13,6 +13,7 @@ describe('WaitingScreen', () => {
   const goBack = vi.fn();
   const leaveQueue = vi.fn();
   const clearMatchFound = vi.fn();
+  const clearInviteCreated = vi.fn();
 
   function mockSocket(overrides: Partial<ReturnType<typeof buildDefaultSocket>> = {}) {
     vi.spyOn(gameSocketContext, 'useGameSocketContext').mockReturnValue({
@@ -27,6 +28,8 @@ describe('WaitingScreen', () => {
       clearMatchFound,
       leaveQueue,
       inviteCreated: false,
+      clearInviteCreated,
+      connected: true,
     };
   }
 
@@ -37,6 +40,7 @@ describe('WaitingScreen', () => {
     goBack.mockClear();
     leaveQueue.mockClear();
     clearMatchFound.mockClear();
+    clearInviteCreated.mockClear();
 
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
       token: 'tok', user: { id: 1, telegramId: 555 } as any, loading: false, error: null,
@@ -99,5 +103,11 @@ describe('WaitingScreen', () => {
     mockSocket();
     render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
     expect(screen.queryByText("Do'stga ulashish")).not.toBeInTheDocument();
+  });
+
+  it('shows a disconnect message when the socket is not connected', () => {
+    mockSocket({ connected: false });
+    render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
+    expect(screen.getByText(/Aloqa uzildi/)).toBeInTheDocument();
   });
 });
