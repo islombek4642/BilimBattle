@@ -75,6 +75,7 @@ export interface UseGameSocketResult {
   joinInvite: (inviterTelegramId: number, category: string) => void;
   reconnectGame: (gameId: string) => Promise<ReconnectAck>;
   clearMatchFound: () => void;
+  clearQuestion: () => void;
   clearQuestionResult: () => void;
   clearGameOver: () => void;
   clearInviteCreated: () => void;
@@ -177,6 +178,7 @@ export function useGameSocket(token: string | null): UseGameSocketResult {
   }, []);
 
   const clearMatchFound = useCallback(() => setMatchFound(null), []);
+  const clearQuestion = useCallback(() => setQuestion(null), []);
   const clearQuestionResult = useCallback(() => setQuestionResult(null), []);
   const clearGameOver = useCallback(() => setGameOver(null), []);
   const clearInviteCreated = useCallback(() => setInviteCreated(false), []);
@@ -198,6 +200,7 @@ export function useGameSocket(token: string | null): UseGameSocketResult {
     joinInvite,
     reconnectGame,
     clearMatchFound,
+    clearQuestion,
     clearQuestionResult,
     clearGameOver,
     clearInviteCreated,
