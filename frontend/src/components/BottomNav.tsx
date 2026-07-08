@@ -16,6 +16,7 @@ export function BottomNav() {
         <button
           key={tab.name}
           type="button"
+          aria-current={current.name === tab.name ? 'page' : undefined}
           className={`text-sm font-medium ${
             current.name === tab.name ? 'text-blue-600' : 'text-gray-400'
           }`}
