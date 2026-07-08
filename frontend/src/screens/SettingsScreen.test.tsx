@@ -53,6 +53,28 @@ describe('SettingsScreen', () => {
     expect(localStorage.getItem('bilimbattle:soundEnabled')).toBe('false');
   });
 
+  it('anchors the toggle thumb with an explicit left-0 so its position does not rely on browser-computed static positioning', async () => {
+    // Regression: the thumb previously had no explicit `left` value and
+    // relied on the browser's static-position fallback for an absolutely
+    // positioned element inside a <button> - inconsistent across browser
+    // engines and reported as a visibly misplaced thumb on a real device.
+    vi.spyOn(statsApi, 'getMyStats').mockResolvedValue({
+      gamesPlayed: 0, gamesWon: 0, winRate: 0, currentStreak: 0, bestStreak: 0, rating: 1000,
+    });
+
+    render(<SettingsScreen />);
+    const toggle = screen.getByRole('switch', { name: 'Ovoz/Vibratsiya' });
+    const thumb = toggle.querySelector('span')!;
+
+    expect(thumb).toHaveClass('left-0');
+    expect(thumb).toHaveClass('translate-x-[25px]');
+
+    fireEvent.click(toggle);
+
+    expect(thumb).toHaveClass('left-0');
+    expect(thumb).toHaveClass('translate-x-[3px]');
+  });
+
   it('reads a previously-persisted sound-off preference on mount', () => {
     localStorage.setItem('bilimbattle:soundEnabled', 'false');
     vi.spyOn(statsApi, 'getMyStats').mockResolvedValue({

@@ -67,7 +67,7 @@ export function SettingsScreen() {
             }`}
           >
             <span
-              className={`absolute top-[3px] h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ${
+              className={`absolute left-0 top-[3px] h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ${
                 soundEnabled ? 'translate-x-[25px]' : 'translate-x-[3px]'
               }`}
             />
