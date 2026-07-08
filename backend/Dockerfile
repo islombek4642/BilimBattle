@@ -16,9 +16,6 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Non-root user
-RUN addgroup -g 1000 appuser && adduser -u 1000 -G appuser -s /bin/sh -D appuser
-
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
@@ -28,8 +25,11 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 COPY src/db/schema.sql ./dist/src/db/schema.sql
 
-RUN chown -R appuser:appuser /app
-USER appuser
+# node:20-alpine already ships a non-root "node" user/group (uid/gid 1000)
+# for exactly this purpose - creating a new one with the same id collides
+# with it and fails the build ("gid '1000' in use").
+RUN chown -R node:node /app
+USER node
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD node -e "require('http').get('http://localhost:'+(process.env.PORT||3000)+'/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
