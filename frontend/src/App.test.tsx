@@ -145,6 +145,7 @@ describe('App', () => {
     vi.mocked(gameSocketContext.useGameSocketContext).mockReturnValue({
       sessionReplaced: false,
       joinInvite,
+      connected: true,
     } as any);
     vi.spyOn(telegram, 'getStartParam').mockReturnValue(undefined);
 
@@ -152,5 +153,20 @@ describe('App', () => {
 
     expect(joinInvite).not.toHaveBeenCalled();
     expect(screen.getByText('Aziz')).toBeInTheDocument();
+  });
+
+  it('does not join an invite until the socket is connected', () => {
+    const joinInvite = vi.fn();
+    vi.mocked(authContext.useAuth).mockReturnValue({
+      token: 'tok', user: { id: 1, firstName: 'Aziz', rating: 1000 } as any, loading: false, error: null,
+    });
+    vi.mocked(gameSocketContext.useGameSocketContext).mockReturnValue({
+      sessionReplaced: false, joinInvite, connected: false,
+    } as any);
+    vi.spyOn(telegram, 'getStartParam').mockReturnValue('invite_555');
+
+    render(<App />);
+
+    expect(joinInvite).not.toHaveBeenCalled();
   });
 });

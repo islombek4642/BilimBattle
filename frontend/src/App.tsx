@@ -44,7 +44,7 @@ function Router() {
 function AppShell() {
   const { loading, error } = useAuth();
   const { current, reset } = useNavigation();
-  const { sessionReplaced, joinInvite } = useGameSocketContext();
+  const { sessionReplaced, joinInvite, connected } = useGameSocketContext();
 
   useEffect(() => {
     readyWebApp();
@@ -53,7 +53,7 @@ function AppShell() {
   const hasHandledInviteRef = useRef(false);
 
   useEffect(() => {
-    if (loading || error || sessionReplaced) return;
+    if (loading || error || sessionReplaced || !connected) return;
     if (hasHandledInviteRef.current) return;
 
     const startParam = getStartParam();
@@ -64,7 +64,7 @@ function AppShell() {
     const inviterTelegramId = Number(match[1]);
     joinInvite(inviterTelegramId, 'umumiy_bilim');
     reset({ name: 'waiting', category: 'umumiy_bilim', intent: 'joining' });
-  }, [loading, error, sessionReplaced, joinInvite, reset]);
+  }, [loading, error, sessionReplaced, connected, joinInvite, reset]);
 
   if (loading) return <div className="p-6 text-center">Yuklanmoqda...</div>;
   if (error) return <div className="p-6 text-center text-red-600">{error}</div>;
