@@ -39,7 +39,7 @@ describe('BattleScreen', () => {
     reconnectGame.mockClear().mockResolvedValue({ found: true });
 
     vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({
-      current: { name: 'battle', gameId: 'g1', category: 'umumiy_bilim' },
+      current: { name: 'battle', gameId: 'g1' },
       navigate: vi.fn(), goBack: vi.fn(), replace, reset: vi.fn(),
     });
     vi.spyOn(authContext, 'useAuth').mockReturnValue({

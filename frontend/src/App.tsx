@@ -1,5 +1,5 @@
 // frontend/src/App.tsx
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NavigationProvider, useNavigation, Screen } from './context/NavigationContext';
 import { GameSocketProvider, useGameSocketContext } from './context/GameSocketContext';
@@ -12,7 +12,7 @@ import { BattleScreen } from './screens/BattleScreen';
 import { ResultScreen } from './screens/ResultScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
-import { readyWebApp } from './telegram/webApp';
+import { readyWebApp, getStartParam } from './telegram/webApp';
 
 function Router() {
   const { current } = useNavigation();
@@ -43,12 +43,28 @@ function Router() {
 
 function AppShell() {
   const { loading, error } = useAuth();
-  const { current } = useNavigation();
-  const { sessionReplaced } = useGameSocketContext();
+  const { current, reset } = useNavigation();
+  const { sessionReplaced, joinInvite } = useGameSocketContext();
 
   useEffect(() => {
     readyWebApp();
   }, []);
+
+  const hasHandledInviteRef = useRef(false);
+
+  useEffect(() => {
+    if (loading || error || sessionReplaced) return;
+    if (hasHandledInviteRef.current) return;
+
+    const startParam = getStartParam();
+    const match = startParam?.match(/^invite_(\d+)$/);
+    if (!match) return;
+
+    hasHandledInviteRef.current = true;
+    const inviterTelegramId = Number(match[1]);
+    joinInvite(inviterTelegramId, 'umumiy_bilim');
+    reset({ name: 'waiting', category: 'umumiy_bilim', intent: 'joining' });
+  }, [loading, error, sessionReplaced, joinInvite, reset]);
 
   if (loading) return <div className="p-6 text-center">Yuklanmoqda...</div>;
   if (error) return <div className="p-6 text-center text-red-600">{error}</div>;

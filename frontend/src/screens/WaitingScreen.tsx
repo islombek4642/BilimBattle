@@ -13,30 +13,40 @@ export function WaitingScreen({
   intent,
 }: {
   category: string;
-  intent: 'quick' | 'invite';
+  intent: 'quick' | 'invite' | 'joining';
 }) {
   const { user } = useAuth();
   const { replace, goBack } = useNavigation();
-  const { matchFound, clearMatchFound, leaveQueue, inviteCreated, clearInviteCreated, connected } =
-    useGameSocketContext();
+  const {
+    matchFound,
+    clearMatchFound,
+    leaveQueue,
+    inviteCreated,
+    clearInviteCreated,
+    inviteExpired,
+    clearInviteExpired,
+    connected,
+  } = useGameSocketContext();
 
   useEffect(() => {
     if (matchFound) {
-      replace({ name: 'battle', gameId: matchFound.gameId, category: matchFound.category });
+      replace({ name: 'battle', gameId: matchFound.gameId });
       clearMatchFound();
     }
     // `GameSocketProvider` sits above `NavigationProvider`, so `matchFound`/
-    // `inviteCreated` persist across mount/unmount as the user navigates
-    // between screens. Without this cleanup, a match that lands right as the
-    // user cancels (leave_queue is fire-and-forget, no ack) would sit in
-    // state and get picked up as stale data the next time this screen
-    // mounts for an unrelated queue/invite. clearMatchFound/clearInviteCreated
-    // are idempotent, so this is safe to run unconditionally on unmount.
+    // `inviteCreated`/`inviteExpired` persist across mount/unmount as the
+    // user navigates between screens. Without this cleanup, a match that
+    // lands right as the user cancels (leave_queue is fire-and-forget, no
+    // ack) would sit in state and get picked up as stale data the next time
+    // this screen mounts for an unrelated queue/invite.
+    // clearMatchFound/clearInviteCreated/clearInviteExpired are idempotent,
+    // so this is safe to run unconditionally on unmount.
     return () => {
       clearMatchFound();
       clearInviteCreated();
+      clearInviteExpired();
     };
-  }, [matchFound, replace, clearMatchFound, clearInviteCreated]);
+  }, [matchFound, replace, clearMatchFound, clearInviteCreated, clearInviteExpired]);
 
   const handleCancel = () => {
     if (intent === 'quick') {
@@ -54,9 +64,16 @@ export function WaitingScreen({
 
   return (
     <div className="flex flex-col items-center gap-4 p-6">
-      <p className="text-lg">{categoryLabel(category)} bo'yicha raqib qidirilmoqda...</p>
+      <p className="text-lg">
+        {intent === 'joining'
+          ? "Do'stingiz o'yiniga ulanmoqda..."
+          : `${categoryLabel(category)} bo'yicha raqib qidirilmoqda...`}
+      </p>
       {!connected && (
         <p className="text-sm text-red-500">Aloqa uzildi. Qayta ulanmoqda...</p>
+      )}
+      {inviteExpired && (
+        <p className="text-sm text-red-500">Taklif muddati tugadi yoki band.</p>
       )}
       {intent === 'invite' && inviteCreated && (
         <p className="text-sm text-gray-500">Havola yuborildi, do'stingiz kutilmoqda</p>

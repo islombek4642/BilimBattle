@@ -14,6 +14,7 @@ describe('WaitingScreen', () => {
   const leaveQueue = vi.fn();
   const clearMatchFound = vi.fn();
   const clearInviteCreated = vi.fn();
+  const clearInviteExpired = vi.fn();
 
   function mockSocket(overrides: Partial<ReturnType<typeof buildDefaultSocket>> = {}) {
     vi.spyOn(gameSocketContext, 'useGameSocketContext').mockReturnValue({
@@ -29,6 +30,8 @@ describe('WaitingScreen', () => {
       leaveQueue,
       inviteCreated: false,
       clearInviteCreated,
+      inviteExpired: false,
+      clearInviteExpired,
       connected: true,
     };
   }
@@ -41,6 +44,7 @@ describe('WaitingScreen', () => {
     leaveQueue.mockClear();
     clearMatchFound.mockClear();
     clearInviteCreated.mockClear();
+    clearInviteExpired.mockClear();
 
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
       token: 'tok', user: { id: 1, telegramId: 555 } as any, loading: false, error: null,
@@ -62,7 +66,7 @@ describe('WaitingScreen', () => {
     render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
 
     await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1', category: 'umumiy_bilim' })
+      expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1' })
     );
     expect(clearMatchFound).toHaveBeenCalledOnce();
   });
@@ -109,5 +113,26 @@ describe('WaitingScreen', () => {
     mockSocket({ connected: false });
     render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
     expect(screen.getByText(/Aloqa uzildi/)).toBeInTheDocument();
+  });
+
+  it('shows a joining-specific message and no share button for intent=joining', () => {
+    mockSocket();
+    render(<WaitingScreen category="umumiy_bilim" intent="joining" />);
+    expect(screen.getByText(/Do'stingiz o'yiniga ulanmoqda/)).toBeInTheDocument();
+    expect(screen.queryByText("Do'stga ulashish")).not.toBeInTheDocument();
+  });
+
+  it('does not call leaveQueue when cancelling a joining attempt', () => {
+    mockSocket();
+    render(<WaitingScreen category="umumiy_bilim" intent="joining" />);
+    fireEvent.click(screen.getByText('Bekor qilish'));
+    expect(leaveQueue).not.toHaveBeenCalled();
+    expect(goBack).toHaveBeenCalledOnce();
+  });
+
+  it('shows an invite-expired message when inviteExpired is true', () => {
+    mockSocket({ inviteExpired: true });
+    render(<WaitingScreen category="umumiy_bilim" intent="invite" />);
+    expect(screen.getByText(/Taklif muddati tugadi/)).toBeInTheDocument();
   });
 });

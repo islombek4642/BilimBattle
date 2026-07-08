@@ -6,8 +6,8 @@ import { ScoreEntry } from '../api/types';
 export type Screen =
   | { name: 'home' }
   | { name: 'categorySelect'; intent: 'quick' | 'invite' }
-  | { name: 'waiting'; category: string; intent: 'quick' | 'invite' }
-  | { name: 'battle'; gameId: string; category: string }
+  | { name: 'waiting'; category: string; intent: 'quick' | 'invite' | 'joining' }
+  | { name: 'battle'; gameId: string }
   | { name: 'result'; scores: ScoreEntry[]; winnerId: number | null; forfeited: boolean }
   | { name: 'leaderboard' }
   | { name: 'settings' };

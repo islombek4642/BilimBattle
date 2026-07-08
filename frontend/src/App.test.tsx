@@ -111,4 +111,46 @@ describe('App', () => {
 
     expect(telegram.readyWebApp).toHaveBeenCalledOnce();
   });
+
+  it('joins an invite and navigates to the joining-waiting screen when start_param matches invite_<id>', () => {
+    const joinInvite = vi.fn();
+    vi.mocked(authContext.useAuth).mockReturnValue({
+      token: 'tok', user: { id: 1, firstName: 'Aziz', rating: 1000 } as any, loading: false, error: null,
+    });
+    vi.mocked(gameSocketContext.useGameSocketContext).mockReturnValue({
+      sessionReplaced: false,
+      joinInvite,
+      matchFound: null,
+      clearMatchFound: vi.fn(),
+      leaveQueue: vi.fn(),
+      inviteCreated: false,
+      clearInviteCreated: vi.fn(),
+      inviteExpired: false,
+      clearInviteExpired: vi.fn(),
+      connected: true,
+    } as any);
+    vi.spyOn(telegram, 'getStartParam').mockReturnValue('invite_555');
+
+    render(<App />);
+
+    expect(joinInvite).toHaveBeenCalledWith(555, 'umumiy_bilim');
+    expect(screen.getByText(/Do'stingiz o'yiniga ulanmoqda/)).toBeInTheDocument();
+  });
+
+  it('does not call joinInvite when there is no invite start_param', () => {
+    const joinInvite = vi.fn();
+    vi.mocked(authContext.useAuth).mockReturnValue({
+      token: 'tok', user: { id: 1, firstName: 'Aziz', rating: 1000 } as any, loading: false, error: null,
+    });
+    vi.mocked(gameSocketContext.useGameSocketContext).mockReturnValue({
+      sessionReplaced: false,
+      joinInvite,
+    } as any);
+    vi.spyOn(telegram, 'getStartParam').mockReturnValue(undefined);
+
+    render(<App />);
+
+    expect(joinInvite).not.toHaveBeenCalled();
+    expect(screen.getByText('Aziz')).toBeInTheDocument();
+  });
 });
