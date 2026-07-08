@@ -11,6 +11,7 @@ describe('BattleScreen', () => {
   const submitAnswer = vi.fn();
   const clearGameOver = vi.fn();
   const clearQuestionResult = vi.fn();
+  const clearQuestion = vi.fn();
   const reconnectGame = vi.fn().mockResolvedValue({ found: true });
 
   function mockSocket(overrides: Record<string, unknown> = {}) {
@@ -22,6 +23,7 @@ describe('BattleScreen', () => {
       submitAnswer,
       clearGameOver,
       clearQuestionResult,
+      clearQuestion,
       reconnectGame,
       ...overrides,
     } as any);
@@ -33,6 +35,7 @@ describe('BattleScreen', () => {
     submitAnswer.mockClear();
     clearGameOver.mockClear();
     clearQuestionResult.mockClear();
+    clearQuestion.mockClear();
     reconnectGame.mockClear().mockResolvedValue({ found: true });
 
     vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({

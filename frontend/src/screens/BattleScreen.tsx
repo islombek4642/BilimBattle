@@ -15,8 +15,8 @@ export function BattleScreen({ gameId }: { gameId: string }) {
     submitAnswer,
     clearGameOver,
     clearQuestionResult,
-    reconnectGame,
     clearQuestion,
+    reconnectGame,
   } = useGameSocketContext();
   const { replace } = useNavigation();
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -67,7 +67,7 @@ export function BattleScreen({ gameId }: { gameId: string }) {
   // this is safe even when they've already been cleared above.
   useEffect(() => {
     return () => {
-      clearQuestion?.();
+      clearQuestion();
       clearQuestionResult();
       clearGameOver();
     };
