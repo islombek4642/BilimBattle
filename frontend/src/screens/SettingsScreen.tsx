@@ -3,21 +3,14 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getMyStats } from '../api/stats';
 import { Stats } from '../api/types';
-
-const SOUND_KEY = 'bilimbattle:soundEnabled';
+import { SOUND_KEY, isSoundEnabled } from '../utils/settings';
 
 export function SettingsScreen() {
   const { token } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(SOUND_KEY) !== 'false';
-    } catch {
-      return true;
-    }
-  });
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(isSoundEnabled);
 
   useEffect(() => {
     if (!token) return;

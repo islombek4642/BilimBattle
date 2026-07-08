@@ -7,6 +7,8 @@ import {
   readyWebApp,
   buildInviteLink,
   shareInviteLink,
+  hapticImpact,
+  hapticNotification,
 } from './webApp';
 
 describe('telegram/webApp', () => {
@@ -72,5 +74,31 @@ describe('telegram/webApp', () => {
 
     expect(openSpy).toHaveBeenCalledOnce();
     openSpy.mockRestore();
+  });
+
+  it('calls HapticFeedback.impactOccurred with the given style when the WebApp is present', () => {
+    const impactOccurred = vi.fn();
+    window.Telegram = { WebApp: { HapticFeedback: { impactOccurred } } } as any;
+
+    hapticImpact('light');
+
+    expect(impactOccurred).toHaveBeenCalledWith('light');
+  });
+
+  it('does not throw when hapticImpact is called with no Telegram WebApp present', () => {
+    expect(() => hapticImpact('medium')).not.toThrow();
+  });
+
+  it('calls HapticFeedback.notificationOccurred with the given type when the WebApp is present', () => {
+    const notificationOccurred = vi.fn();
+    window.Telegram = { WebApp: { HapticFeedback: { notificationOccurred } } } as any;
+
+    hapticNotification('success');
+
+    expect(notificationOccurred).toHaveBeenCalledWith('success');
+  });
+
+  it('does not throw when hapticNotification is called with no Telegram WebApp present', () => {
+    expect(() => hapticNotification('error')).not.toThrow();
   });
 });

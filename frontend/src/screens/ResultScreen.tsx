@@ -1,8 +1,10 @@
 // frontend/src/screens/ResultScreen.tsx
+import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
 import { shareInviteLink } from '../telegram/webApp';
 import { findMyScore } from '../utils/score';
+import { playResultFeedback } from '../utils/feedback';
 import { ScoreEntry } from '../api/types';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
@@ -18,12 +20,21 @@ export function ResultScreen({
 }) {
   const { user } = useAuth();
   const { reset } = useNavigation();
+  const isWinner = winnerId === user?.id;
+  const isDraw = winnerId === null;
+
+  // Fires once on mount (the outcome for a given result screen never
+  // changes) - not gated behind the `!user` guard below since hooks must
+  // run unconditionally on every render; user is always set by the time
+  // this screen is reachable in practice (see HomeScreen's identical guard).
+  useEffect(() => {
+    if (!user) return;
+    playResultFeedback(isDraw ? 'draw' : isWinner ? 'win' : 'loss');
+  }, []);
 
   if (!user) return null;
 
   const myScore = findMyScore(scores, user.id);
-  const isWinner = winnerId === user.id;
-  const isDraw = winnerId === null;
   const resultText = isDraw ? 'Durrang!' : isWinner ? "G'alaba qozondingiz!" : "Mag'lubiyat";
 
   const handleShare = () => {

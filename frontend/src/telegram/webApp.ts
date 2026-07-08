@@ -55,6 +55,14 @@ export function buildInviteLink(botUsername: string, inviterTelegramId: number):
   return `https://t.me/${botUsername}?startapp=invite_${inviterTelegramId}`;
 }
 
+export function hapticImpact(style: 'light' | 'medium' | 'heavy'): void {
+  getTelegramWebApp()?.HapticFeedback.impactOccurred(style);
+}
+
+export function hapticNotification(type: 'success' | 'error' | 'warning'): void {
+  getTelegramWebApp()?.HapticFeedback.notificationOccurred(type);
+}
+
 export function shareInviteLink(link: string, text: string): void {
   const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
   const webApp = getTelegramWebApp();

@@ -5,6 +5,7 @@ import { ResultScreen } from './ResultScreen';
 import * as authContext from '../context/AuthContext';
 import * as navigationContext from '../context/NavigationContext';
 import * as telegram from '../telegram/webApp';
+import * as feedback from '../utils/feedback';
 
 describe('ResultScreen', () => {
   const reset = vi.fn();
@@ -19,6 +20,7 @@ describe('ResultScreen', () => {
       current: { name: 'result', scores: [], winnerId: null, forfeited: false },
       navigate: vi.fn(), goBack: vi.fn(), replace: vi.fn(), reset,
     });
+    vi.spyOn(feedback, 'playResultFeedback').mockImplementation(() => {});
   });
 
   it('shows a win message and the player\'s own score when they are the winner', () => {
@@ -89,5 +91,20 @@ describe('ResultScreen', () => {
     expect(shareSpy).toHaveBeenCalledOnce();
     const [, text] = shareSpy.mock.calls[0];
     expect(text).toContain('450');
+  });
+
+  it('plays "win" result feedback when the player won', () => {
+    render(<ResultScreen scores={[{ userId: 1, score: 550 }]} winnerId={1} forfeited={false} />);
+    expect(feedback.playResultFeedback).toHaveBeenCalledWith('win');
+  });
+
+  it('plays "loss" result feedback when the other player won', () => {
+    render(<ResultScreen scores={[{ userId: 1, score: 200 }]} winnerId={2} forfeited={false} />);
+    expect(feedback.playResultFeedback).toHaveBeenCalledWith('loss');
+  });
+
+  it('plays "draw" result feedback when winnerId is null', () => {
+    render(<ResultScreen scores={[{ userId: 1, score: 300 }]} winnerId={null} forfeited={false} />);
+    expect(feedback.playResultFeedback).toHaveBeenCalledWith('draw');
   });
 });

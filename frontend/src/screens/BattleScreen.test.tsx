@@ -5,6 +5,7 @@ import { BattleScreen } from './BattleScreen';
 import * as navigationContext from '../context/NavigationContext';
 import * as gameSocketContext from '../context/GameSocketContext';
 import * as authContext from '../context/AuthContext';
+import * as feedback from '../utils/feedback';
 
 describe('BattleScreen', () => {
   const replace = vi.fn();
@@ -45,6 +46,9 @@ describe('BattleScreen', () => {
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
       token: 'tok', user: { id: 1 } as any, loading: false, error: null,
     });
+    vi.spyOn(feedback, 'playSelectFeedback').mockImplementation(() => {});
+    vi.spyOn(feedback, 'playCorrectFeedback').mockImplementation(() => {});
+    vi.spyOn(feedback, 'playIncorrectFeedback').mockImplementation(() => {});
   });
 
   it('shows a waiting message when no question has arrived yet', () => {
@@ -117,5 +121,52 @@ describe('BattleScreen', () => {
     mockSocket();
     render(<BattleScreen gameId="g1" />);
     expect(reconnectGame).toHaveBeenCalledWith('g1');
+  });
+
+  it('plays select feedback when an option is tapped', () => {
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
+    });
+    render(<BattleScreen gameId="g1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'A' }));
+
+    expect(feedback.playSelectFeedback).toHaveBeenCalledOnce();
+  });
+
+  it('plays correct feedback when the chosen option matches the revealed correct answer', () => {
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
+    });
+    const { rerender } = render(<BattleScreen gameId="g1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'A' }));
+
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
+      questionResult: { index: 0, correctIndex: 0, scores: [] },
+    });
+    rerender(<BattleScreen gameId="g1" />);
+
+    expect(feedback.playCorrectFeedback).toHaveBeenCalledOnce();
+    expect(feedback.playIncorrectFeedback).not.toHaveBeenCalled();
+  });
+
+  it('plays incorrect feedback when the chosen option does not match the revealed correct answer', () => {
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
+    });
+    const { rerender } = render(<BattleScreen gameId="g1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'A' }));
+
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
+      questionResult: { index: 0, correctIndex: 1, scores: [] },
+    });
+    rerender(<BattleScreen gameId="g1" />);
+
+    expect(feedback.playIncorrectFeedback).toHaveBeenCalledOnce();
+    expect(feedback.playCorrectFeedback).not.toHaveBeenCalled();
   });
 });

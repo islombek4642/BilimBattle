@@ -5,6 +5,7 @@ import { useGameSocketContext } from '../context/GameSocketContext';
 import { ScoreBar } from '../components/ScoreBar';
 import { CountdownTimer } from '../components/CountdownTimer';
 import { ScoreEntry } from '../api/types';
+import { playSelectFeedback, playCorrectFeedback, playIncorrectFeedback } from '../utils/feedback';
 
 export function BattleScreen({ gameId }: { gameId: string }) {
   const {
@@ -73,8 +74,21 @@ export function BattleScreen({ gameId }: { gameId: string }) {
     };
   }, [clearQuestion, clearQuestionResult, clearGameOver]);
 
+  // Fires exactly once per question: questionResult is reset to null every
+  // time a new `question` event arrives, so this effect's dependency array
+  // naturally sees a fresh (non-null) questionResult only once per index.
+  useEffect(() => {
+    if (!questionResult || questionResult.index !== answeredIndex) return;
+    if (selectedOption === questionResult.correctIndex) {
+      playCorrectFeedback();
+    } else {
+      playIncorrectFeedback();
+    }
+  }, [questionResult, answeredIndex, selectedOption]);
+
   const handleSelect = (optionIndex: number) => {
     if (!question || selectedOption !== null) return;
+    playSelectFeedback();
     setSelectedOption(optionIndex);
     setAnsweredIndex(question.index);
     submitAnswer(gameId, question.index, optionIndex);
