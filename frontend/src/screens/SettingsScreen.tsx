@@ -57,32 +57,54 @@ export function SettingsScreen() {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <h2 className="text-lg font-bold">Sozlamalar</h2>
-      <div className="flex items-center justify-between">
-        <span>Ovoz/Vibratsiya</span>
-        <button
-          type="button"
-          aria-pressed={soundEnabled}
-          className={`rounded-full px-4 py-1 font-semibold ${
-            soundEnabled ? 'bg-blue-600 text-white' : 'bg-gray-200'
-          }`}
-          onClick={toggleSound}
-        >
-          {soundEnabled ? 'Yoqilgan' : "O'chirilgan"}
-        </button>
+    <div className="flex flex-col gap-6 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
+      <h2 className="text-lg font-bold text-ios-label">Sozlamalar</h2>
+
+      <div className="rounded-2xl bg-ios-card px-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
+        <div className="flex items-center justify-between py-3.5">
+          <span className="text-ios-label">Ovoz/Vibratsiya</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={soundEnabled}
+            aria-label="Ovoz/Vibratsiya"
+            onClick={toggleSound}
+            className={`relative h-[30px] w-[52px] rounded-full transition-colors duration-200 ${
+              soundEnabled ? 'bg-ios-green' : 'bg-ios-divider'
+            }`}
+          >
+            <span
+              className={`absolute top-[3px] h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ${
+                soundEnabled ? 'translate-x-[25px]' : 'translate-x-[3px]'
+              }`}
+            />
+          </button>
+        </div>
       </div>
-      {loading && <p className="text-sm text-gray-500">Yuklanmoqda...</p>}
+
+      {loading && <p className="text-sm text-ios-secondary-label">Yuklanmoqda...</p>}
       {!loading && error && (
-        <p className="text-sm text-red-500">Statistikani yuklab bo'lmadi.</p>
+        <p className="text-sm text-ios-red">Statistikani yuklab bo'lmadi.</p>
       )}
       {!loading && !error && stats && (
-        <div className="flex flex-col gap-1 rounded-lg bg-gray-50 p-4">
-          <p>O'ynagan o'yinlar: {stats.gamesPlayed}</p>
-          <p>G'alaba foizi: {stats.winRate}%</p>
-          <p>Joriy seriya: {stats.currentStreak}</p>
-          <p>Eng uzun seriya: {stats.bestStreak}</p>
-          <p>Reyting: {stats.rating}</p>
+        <div className="flex flex-col gap-2 rounded-2xl bg-ios-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
+          {[
+            { label: "O'ynagan o'yinlar", value: stats.gamesPlayed },
+            { label: "G'alaba foizi", value: `${stats.winRate}%` },
+            { label: 'Joriy seriya', value: stats.currentStreak },
+            { label: 'Eng uzun seriya', value: stats.bestStreak },
+            { label: 'Reyting', value: stats.rating },
+          ].map((row, i, arr) => (
+            <div
+              key={row.label}
+              className={`flex items-center justify-between py-2 ${
+                i < arr.length - 1 ? 'border-b border-ios-divider' : ''
+              }`}
+            >
+              <span className="text-sm text-ios-secondary-label">{row.label}</span>
+              <span className="font-semibold tabular-nums text-ios-label">{row.value}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>

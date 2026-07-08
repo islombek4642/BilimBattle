@@ -8,9 +8,18 @@ export function ScoreBar({ scores }: { scores: ScoreEntry[] }) {
   const myUserId = user?.id ?? -1;
 
   return (
-    <div className="flex justify-between text-sm font-semibold" data-testid="score-bar">
-      <span>Siz: {findMyScore(scores, myUserId)}</span>
-      <span>Raqib: {findOpponentScore(scores, myUserId)}</span>
+    <div
+      className="flex items-center justify-between rounded-2xl bg-ios-card px-5 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]"
+      data-testid="score-bar"
+    >
+      <div className="flex flex-col items-start">
+        <span className="text-xs font-medium text-ios-secondary-label">Siz</span>
+        <span className="text-xl font-bold text-ios-blue">{findMyScore(scores, myUserId)}</span>
+      </div>
+      <div className="flex flex-col items-end">
+        <span className="text-xs font-medium text-ios-secondary-label">Raqib</span>
+        <span className="text-xl font-bold text-ios-label">{findOpponentScore(scores, myUserId)}</span>
+      </div>
     </div>
   );
 }

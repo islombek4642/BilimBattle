@@ -47,11 +47,11 @@ export function CategorySelectScreen({ intent }: { intent: 'quick' | 'invite' })
   };
 
   return (
-    <div className="flex flex-col gap-3 p-6">
-      <h2 className="text-lg font-bold">Kategoriya tanlang</h2>
-      {loading && <p className="text-sm text-gray-500">Yuklanmoqda...</p>}
+    <div className="flex flex-col gap-3 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
+      <h2 className="text-lg font-bold text-ios-label">Kategoriya tanlang</h2>
+      {loading && <p className="text-sm text-ios-secondary-label">Yuklanmoqda...</p>}
       {!loading && error && (
-        <p className="text-sm text-red-500">Kategoriyalarni yuklab bo'lmadi.</p>
+        <p className="text-sm text-ios-red">Kategoriyalarni yuklab bo'lmadi.</p>
       )}
       {!loading &&
         !error &&
@@ -59,10 +59,10 @@ export function CategorySelectScreen({ intent }: { intent: 'quick' | 'invite' })
           <button
             key={c.key}
             type="button"
-            className="w-full rounded-lg bg-gray-100 py-3 font-semibold text-gray-800"
+            className="w-full rounded-2xl bg-ios-card py-4 text-left font-semibold text-ios-label shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)] transition-transform duration-150 active:scale-[0.98]"
             onClick={() => handleSelect(c.key)}
           >
-            {c.label}
+            <span className="px-5">{c.label}</span>
           </button>
         ))}
     </div>

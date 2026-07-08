@@ -66,12 +66,25 @@ function AppShell() {
     reset({ name: 'waiting', category: 'umumiy_bilim', intent: 'joining' });
   }, [loading, error, sessionReplaced, connected, joinInvite, reset]);
 
-  if (loading) return <div className="p-6 text-center">Yuklanmoqda...</div>;
-  if (error) return <div className="p-6 text-center text-red-600">{error}</div>;
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-ios-bg p-6 text-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-ios-divider border-t-ios-blue" />
+        <p className="text-sm text-ios-secondary-label">Yuklanmoqda...</p>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-2 bg-ios-bg p-6 text-center text-ios-red">
+        {error}
+      </div>
+    );
+  }
   if (sessionReplaced) {
     return (
-      <div className="flex flex-col items-center gap-4 p-6 text-center">
-        <p>Bu sessiya boshqa qurilmada ochildi.</p>
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-ios-bg p-6 text-center">
+        <p className="text-ios-label">Bu sessiya boshqa qurilmada ochildi.</p>
         <PrimaryButton onClick={() => window.location.reload()}>Qayta yuklash</PrimaryButton>
       </div>
     );
@@ -80,7 +93,7 @@ function AppShell() {
   const showBottomNav = ['home', 'leaderboard', 'settings'].includes(current.name);
 
   return (
-    <div className="flex min-h-screen flex-col justify-between">
+    <div className="flex min-h-dvh flex-col justify-between bg-ios-bg">
       <div className="flex-1">
         <Router />
       </div>

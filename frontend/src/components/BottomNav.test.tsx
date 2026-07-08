@@ -41,10 +41,10 @@ describe('BottomNav', () => {
 
     const homeTab = screen.getByRole('button', { name: 'Bosh sahifa' });
     expect(homeTab).toHaveAttribute('aria-current', 'page');
-    expect(homeTab).toHaveClass('text-blue-600');
+    expect(homeTab).toHaveClass('text-ios-blue');
 
     const leaderboardTab = screen.getByRole('button', { name: 'Reyting' });
     expect(leaderboardTab).not.toHaveAttribute('aria-current');
-    expect(leaderboardTab).toHaveClass('text-gray-400');
+    expect(leaderboardTab).toHaveClass('text-ios-secondary-label');
   });
 });

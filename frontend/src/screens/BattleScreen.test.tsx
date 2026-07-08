@@ -70,11 +70,11 @@ describe('BattleScreen', () => {
     });
     render(<BattleScreen gameId="g1" />);
 
-    fireEvent.click(screen.getByText('A'));
+    fireEvent.click(screen.getByRole('button', { name: 'A' }));
 
     expect(submitAnswer).toHaveBeenCalledWith('g1', 2, 0);
-    expect(screen.getByText('A')).toBeDisabled();
-    expect(screen.getByText('B')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'A' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'B' })).toBeDisabled();
   });
 
   it('ignores a second click after an answer has already been selected', () => {
@@ -83,8 +83,8 @@ describe('BattleScreen', () => {
     });
     render(<BattleScreen gameId="g1" />);
 
-    fireEvent.click(screen.getByText('A'));
-    fireEvent.click(screen.getByText('B'));
+    fireEvent.click(screen.getByRole('button', { name: 'A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'B' }));
 
     expect(submitAnswer).toHaveBeenCalledOnce();
   });
@@ -96,7 +96,7 @@ describe('BattleScreen', () => {
     });
     render(<BattleScreen gameId="g1" />);
 
-    expect(screen.getByText('B')).toHaveClass('bg-green-500');
+    expect(screen.getByRole('button', { name: 'B' })).toHaveClass('bg-ios-green');
   });
 
   it('navigates to the result screen (via replace) when gameOver arrives', async () => {

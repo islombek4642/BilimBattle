@@ -17,3 +17,36 @@
  * `ring-2 ring-blue-500`).
  */
 @import "tailwindcss";
+
+/*
+ * Premium iOS design tokens (Tailwind v4 @theme block - the correct way to
+ * add custom design tokens without a JS config, per the note above).
+ * Colors are Apple's actual iOS system palette (systemBlue/Green/Red,
+ * label/secondaryLabel, systemGroupedBackground), not an approximation -
+ * these exact hex values are what iOS itself renders.
+ */
+@theme {
+  --color-ios-bg: #f2f2f7;
+  --color-ios-card: #ffffff;
+  --color-ios-label: #1c1c1e;
+  --color-ios-secondary-label: #8e8e93;
+  --color-ios-divider: #e5e5ea;
+  --color-ios-blue: #007aff;
+  --color-ios-blue-pressed: #0062cc;
+  --color-ios-green: #34c759;
+  --color-ios-red: #ff3b30;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/*
+ * -apple-system/BlinkMacSystemFont resolve to the real San Francisco font on
+ * Apple devices (the actual OS font, not a Google Fonts approximation) -
+ * the most honest and highest-fidelity way to get genuine iOS typography
+ * for a Telegram Mini App, since most users open it inside iOS/macOS
+ * WebKit. Falls back to each OS's own native UI font elsewhere.
+ */
+body {
+  background-color: var(--color-ios-bg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}

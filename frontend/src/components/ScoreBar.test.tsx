@@ -19,8 +19,10 @@ describe('ScoreBar', () => {
       />
     );
 
-    expect(screen.getByText(/Siz: 450/)).toBeInTheDocument();
-    expect(screen.getByText(/Raqib: 300/)).toBeInTheDocument();
+    expect(screen.getByText('Siz')).toBeInTheDocument();
+    expect(screen.getByText('450')).toBeInTheDocument();
+    expect(screen.getByText('Raqib')).toBeInTheDocument();
+    expect(screen.getByText('300')).toBeInTheDocument();
   });
 
   it('renders zeros when scores is empty', () => {
@@ -30,7 +32,6 @@ describe('ScoreBar', () => {
 
     render(<ScoreBar scores={[]} />);
 
-    expect(screen.getByText(/Siz: 0/)).toBeInTheDocument();
-    expect(screen.getByText(/Raqib: 0/)).toBeInTheDocument();
+    expect(screen.getAllByText('0')).toHaveLength(2);
   });
 });

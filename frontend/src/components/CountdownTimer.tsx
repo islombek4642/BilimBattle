@@ -15,9 +15,19 @@ export function CountdownTimer({ timeLimitMs }: { timeLimitMs: number }) {
     return () => clearInterval(interval);
   }, [timeLimitMs]);
 
+  const seconds = msToSeconds(remainingMs);
+  const isLow = seconds <= 3;
+
   return (
-    <div className="text-center text-2xl font-bold" data-testid="countdown-timer">
-      {msToSeconds(remainingMs)}s
+    <div className="flex justify-center">
+      <div
+        className={`flex h-14 w-14 items-center justify-center rounded-full text-xl font-bold tabular-nums transition-colors duration-300 ${
+          isLow ? 'bg-ios-red/10 text-ios-red' : 'bg-ios-card text-ios-label shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]'
+        }`}
+        data-testid="countdown-timer"
+      >
+        {seconds}s
+      </div>
     </div>
   );
 }

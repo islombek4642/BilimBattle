@@ -10,7 +10,7 @@ export function SecondaryButton({
   return (
     <button
       type={type}
-      className={`w-full rounded-lg bg-gray-200 py-3 font-semibold text-gray-800 ${className}`}
+      className={`w-full rounded-full bg-ios-divider py-3.5 font-semibold text-ios-label transition-transform duration-150 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100 ${className}`}
       {...props}
     >
       {children}

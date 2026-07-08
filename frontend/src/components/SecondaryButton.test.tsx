@@ -22,6 +22,6 @@ describe('SecondaryButton', () => {
 
   it('appends a caller-provided className to the default classes', () => {
     render(<SecondaryButton className="mt-4">Test</SecondaryButton>);
-    expect(screen.getByRole('button', { name: 'Test' })).toHaveClass('mt-4', 'bg-gray-200');
+    expect(screen.getByRole('button', { name: 'Test' })).toHaveClass('mt-4', 'bg-ios-divider');
   });
 });

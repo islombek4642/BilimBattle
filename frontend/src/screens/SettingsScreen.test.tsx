@@ -25,11 +25,16 @@ describe('SettingsScreen', () => {
 
     render(<SettingsScreen />);
 
-    await waitFor(() => expect(screen.getByText(/O'ynagan o'yinlar: 10/)).toBeInTheDocument());
-    expect(screen.getByText(/G'alaba foizi: 60%/)).toBeInTheDocument();
-    expect(screen.getByText(/Joriy seriya: 2/)).toBeInTheDocument();
-    expect(screen.getByText(/Eng uzun seriya: 4/)).toBeInTheDocument();
-    expect(screen.getByText(/Reyting: 1080/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("O'ynagan o'yinlar")).toBeInTheDocument());
+    expect(screen.getByText('10')).toBeInTheDocument();
+    expect(screen.getByText("G'alaba foizi")).toBeInTheDocument();
+    expect(screen.getByText('60%')).toBeInTheDocument();
+    expect(screen.getByText('Joriy seriya')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('Eng uzun seriya')).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.getByText('Reyting')).toBeInTheDocument();
+    expect(screen.getByText('1080')).toBeInTheDocument();
   });
 
   it('defaults sound to enabled and toggles it, persisting to localStorage', async () => {
@@ -39,11 +44,12 @@ describe('SettingsScreen', () => {
 
     render(<SettingsScreen />);
 
-    expect(screen.getByText('Yoqilgan')).toBeInTheDocument();
+    const toggle = screen.getByRole('switch', { name: 'Ovoz/Vibratsiya' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
 
-    fireEvent.click(screen.getByText('Yoqilgan'));
+    fireEvent.click(toggle);
 
-    expect(screen.getByText("O'chirilgan")).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
     expect(localStorage.getItem('bilimbattle:soundEnabled')).toBe('false');
   });
 
@@ -55,7 +61,7 @@ describe('SettingsScreen', () => {
 
     render(<SettingsScreen />);
 
-    expect(screen.getByText("O'chirilgan")).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Ovoz/Vibratsiya' })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('shows a loading state while stats are being fetched', async () => {

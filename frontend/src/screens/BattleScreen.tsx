@@ -81,15 +81,21 @@ export function BattleScreen({ gameId }: { gameId: string }) {
   };
 
   if (!question) {
-    return <div className="p-6 text-center">Keyingi savol kutilmoqda...</div>;
+    return (
+      <div className="flex min-h-full items-center justify-center p-6 text-center text-ios-secondary-label">
+        Keyingi savol kutilmoqda...
+      </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <ScoreBar scores={questionResult?.scores ?? restoredScores} />
-      <CountdownTimer key={question.index} timeLimitMs={question.timeLimitMs} />
-      <p className="text-lg font-semibold">{question.text}</p>
-      <div className="flex flex-col gap-2">
+    <div className="flex min-h-full flex-col gap-5 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
+      <div className="flex items-center justify-between gap-4">
+        <ScoreBar scores={questionResult?.scores ?? restoredScores} />
+        <CountdownTimer key={question.index} timeLimitMs={question.timeLimitMs} />
+      </div>
+      <p className="text-xl font-bold leading-snug text-ios-label">{question.text}</p>
+      <div className="flex flex-col gap-3">
         {question.options.map((option, index) => {
           const isCorrect = questionResult?.index === question.index && questionResult.correctIndex === index;
           const isSelected = selectedOption === index;
@@ -99,15 +105,15 @@ export function BattleScreen({ gameId }: { gameId: string }) {
               type="button"
               disabled={selectedOption !== null}
               onClick={() => handleSelect(index)}
-              className={`rounded-lg py-3 font-medium ${
+              className={`w-full rounded-2xl py-4 text-left font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)] transition-transform duration-150 active:scale-[0.98] disabled:active:scale-100 ${
                 isCorrect
-                  ? 'bg-green-500 text-white'
+                  ? 'bg-ios-green text-white'
                   : isSelected
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100'
+                    ? 'bg-ios-blue text-white'
+                    : 'bg-ios-card text-ios-label'
               }`}
             >
-              {option}
+              <span className="px-5">{option}</span>
             </button>
           );
         })}

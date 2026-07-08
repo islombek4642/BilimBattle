@@ -63,25 +63,31 @@ export function WaitingScreen({
   };
 
   return (
-    <div className="flex flex-col items-center gap-4 p-6">
-      <p className="text-lg">
+    <div className="flex min-h-full flex-col items-center justify-center gap-5 p-6 text-center">
+      <div className="relative flex h-20 w-20 items-center justify-center">
+        <div className="absolute h-20 w-20 animate-ping rounded-full bg-ios-blue/20" />
+        <div className="h-14 w-14 rounded-full bg-ios-blue/10" />
+      </div>
+      <p className="text-lg font-medium text-ios-label">
         {intent === 'joining'
           ? "Do'stingiz o'yiniga ulanmoqda..."
           : `${categoryLabel(category)} bo'yicha raqib qidirilmoqda...`}
       </p>
       {!connected && (
-        <p className="text-sm text-red-500">Aloqa uzildi. Qayta ulanmoqda...</p>
+        <p className="text-sm text-ios-red">Aloqa uzildi. Qayta ulanmoqda...</p>
       )}
       {inviteExpired && (
-        <p className="text-sm text-red-500">Taklif muddati tugadi yoki band.</p>
+        <p className="text-sm text-ios-red">Taklif muddati tugadi yoki band.</p>
       )}
       {intent === 'invite' && inviteCreated && (
-        <p className="text-sm text-gray-500">Havola yuborildi, do'stingiz kutilmoqda</p>
+        <p className="text-sm text-ios-secondary-label">Havola yuborildi, do'stingiz kutilmoqda</p>
       )}
-      {intent === 'invite' && (
-        <PrimaryButton onClick={handleShare}>Do'stga ulashish</PrimaryButton>
-      )}
-      <SecondaryButton onClick={handleCancel}>Bekor qilish</SecondaryButton>
+      <div className="flex w-full flex-col gap-3">
+        {intent === 'invite' && (
+          <PrimaryButton onClick={handleShare}>Do'stga ulashish</PrimaryButton>
+        )}
+        <SecondaryButton onClick={handleCancel}>Bekor qilish</SecondaryButton>
+      </div>
     </div>
   );
 }
