@@ -22,13 +22,15 @@ let activeSocketsByUser = new Map<number, string>();
 function trackActiveSocket(io: AppServer, socket: AppSocket, userId: number): void {
   const existingSocketId = activeSocketsByUser.get(userId);
   if (existingSocketId && existingSocketId !== socket.id) {
+    console.log(`socketServer: userId=${userId} reconnected on socket=${socket.id} - disconnecting previous socket=${existingSocketId} (session_replaced)`);
     const existingSocket = io.sockets.sockets.get(existingSocketId);
     existingSocket?.emit('session_replaced');
     existingSocket?.disconnect(true);
   }
   activeSocketsByUser.set(userId, socket.id);
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
+    console.log(`socketServer: socket=${socket.id} (userId=${userId}) disconnected, reason=${reason}`);
     if (activeSocketsByUser.get(userId) === socket.id) {
       activeSocketsByUser.delete(userId);
     }
@@ -56,6 +58,7 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
   });
 
   io.on('connection', (socket: AppSocket) => {
+    console.log(`socketServer: new connection socket=${socket.id} userId=${socket.data.userId} telegramId=${socket.data.telegramId}`);
     trackActiveSocket(io!, socket, socket.data.userId);
 
     // Same fire-and-forget hazard as create_invite/join_invite below - Socket.io
@@ -78,7 +81,10 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
       // second concurrent match, silently overwriting socket.data.gameId and
       // leaving the first game's disconnect/reconnect bookkeeping pointing
       // at the wrong game. Same guard as create_invite/join_invite below.
-      if (socket.data.gameId) return;
+      if (socket.data.gameId) {
+        console.log(`socketServer: ignoring join_queue from userId=${socket.data.userId} - socket already has an active gameId=${socket.data.gameId}`);
+        return;
+      }
       handleJoinQueue(io!, socket.id, socket.data.userId, category).catch((err) => {
         console.error(`socketServer: failed to join queue for user ${socket.data.userId}`, err);
       });

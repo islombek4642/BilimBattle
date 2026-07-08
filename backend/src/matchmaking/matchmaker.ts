@@ -60,7 +60,12 @@ export async function handleJoinQueue(io: AppServer, socketId: string, userId: n
   // instead of its own), and joinQueue would push a second Redis entry for
   // the same user, letting popTwoIfAvailable return [thisUser, thisUser] —
   // a user matched against themselves.
-  if (waitingTimers.has(userId)) return;
+  if (waitingTimers.has(userId)) {
+    console.log(`matchmaker: ignoring duplicate join_queue from userId=${userId} (already waiting) category=${category}`);
+    return;
+  }
+
+  console.log(`matchmaker: join_queue received userId=${userId} socketId=${socketId} category=${category}`);
 
   const pair = await runSerialized(category, async () => {
     await joinQueue(category, { userId, socketId });
@@ -69,11 +74,14 @@ export async function handleJoinQueue(io: AppServer, socketId: string, userId: n
 
   if (pair) {
     const [player1, player2] = pair;
+    console.log(`matchmaker: paired userId=${player1.userId} with userId=${player2.userId} category=${category}`);
     clearWaitingTimer(player1.userId);
     clearWaitingTimer(player2.userId);
     await createMatch(io, category, player1, player2);
     return;
   }
+
+  console.log(`matchmaker: no opponent yet for userId=${userId} category=${category} - waiting up to ${BOT_MATCH_TIMEOUT_MS}ms before bot fallback`);
 
   const timer = setTimeout(() => {
     waitingTimers.delete(userId);
@@ -89,7 +97,11 @@ export async function handleJoinQueue(io: AppServer, socketId: string, userId: n
       // user is already gone from the Redis list, and already has/will have
       // a real match) — `removed` is false, and we must NOT proceed to
       // create a second, duplicate bot match for the same user.
-      if (!removed) return;
+      if (!removed) {
+        console.log(`matchmaker: bot-fallback timer fired for userId=${userId} but they were already paired/removed - skipping`);
+        return;
+      }
+      console.log(`matchmaker: bot-fallback timeout reached for userId=${userId} category=${category} - matching with a bot`);
       const bot = await getOrCreateBotUser();
       await createMatch(io, category, { userId, socketId }, { userId: bot.id, socketId: 'bot' }, true);
     }).catch((err) => {
