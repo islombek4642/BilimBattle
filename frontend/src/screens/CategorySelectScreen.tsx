@@ -51,7 +51,7 @@ export function CategorySelectScreen({ intent }: { intent: 'quick' | 'invite' })
       <h2 className="text-lg font-bold">Kategoriya tanlang</h2>
       {loading && <p className="text-sm text-gray-500">Yuklanmoqda...</p>}
       {!loading && error && (
-        <p className="text-sm text-red-500">Kategoriyalarni yuklab bo'lmadi. Qayta urinib ko'ring.</p>
+        <p className="text-sm text-red-500">Kategoriyalarni yuklab bo'lmadi.</p>
       )}
       {!loading &&
         !error &&
@@ -59,7 +59,7 @@ export function CategorySelectScreen({ intent }: { intent: 'quick' | 'invite' })
           <button
             key={c.key}
             type="button"
-            className="rounded-lg bg-gray-100 py-3 font-semibold"
+            className="w-full rounded-lg bg-gray-100 py-3 font-semibold text-gray-800"
             onClick={() => handleSelect(c.key)}
           >
             {c.label}

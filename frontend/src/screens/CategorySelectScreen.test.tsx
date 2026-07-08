@@ -60,4 +60,26 @@ describe('CategorySelectScreen', () => {
     expect(joinQueue).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith({ name: 'waiting', category: 'umumiy_bilim', intent: 'invite' });
   });
+
+  it('shows a loading state while categories are being fetched', async () => {
+    let resolveCategories: (value: { categories: any[] }) => void;
+    vi.spyOn(questionsApi, 'getCategories').mockReturnValue(
+      new Promise((resolve) => { resolveCategories = resolve; })
+    );
+
+    render(<CategorySelectScreen intent="quick" />);
+
+    expect(screen.getByText(/Yuklanmoqda/)).toBeInTheDocument();
+
+    resolveCategories!({ categories: [] });
+    await waitFor(() => expect(screen.queryByText(/Yuklanmoqda/)).not.toBeInTheDocument());
+  });
+
+  it('shows an error message when categories fail to load', async () => {
+    vi.spyOn(questionsApi, 'getCategories').mockRejectedValue(new Error('network down'));
+
+    render(<CategorySelectScreen intent="quick" />);
+
+    await waitFor(() => expect(screen.getByText(/Kategoriyalarni yuklab bo'lmadi/)).toBeInTheDocument());
+  });
 });
