@@ -1,6 +1,6 @@
 // frontend/src/App.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import App from './App';
 import * as authContext from './context/AuthContext';
 import * as gameSocketContext from './context/GameSocketContext';
@@ -80,6 +80,23 @@ describe('App', () => {
 
     expect(screen.getByText(/boshqa qurilmada ochildi/)).toBeInTheDocument();
     expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument();
+  });
+
+  it('shows a reload button on the session-replaced screen', () => {
+    vi.mocked(authContext.useAuth).mockReturnValue({
+      token: 'tok', user: { id: 1, firstName: 'Aziz', rating: 1000 } as any, loading: false, error: null,
+    });
+    vi.mocked(gameSocketContext.useGameSocketContext).mockReturnValue({
+      sessionReplaced: true,
+    } as any);
+    const reloadSpy = vi.fn();
+    vi.stubGlobal('location', { ...window.location, reload: reloadSpy });
+
+    render(<App />);
+    fireEvent.click(screen.getByText('Qayta yuklash'));
+
+    expect(reloadSpy).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
   });
 
   it('calls readyWebApp on mount', () => {

@@ -1,9 +1,10 @@
 // frontend/src/App.tsx
 import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { NavigationProvider, useNavigation } from './context/NavigationContext';
+import { NavigationProvider, useNavigation, Screen } from './context/NavigationContext';
 import { GameSocketProvider, useGameSocketContext } from './context/GameSocketContext';
 import { BottomNav } from './components/BottomNav';
+import { PrimaryButton } from './components/PrimaryButton';
 import { HomeScreen } from './screens/HomeScreen';
 import { CategorySelectScreen } from './screens/CategorySelectScreen';
 import { WaitingScreen } from './screens/WaitingScreen';
@@ -33,6 +34,10 @@ function Router() {
       return <LeaderboardScreen />;
     case 'settings':
       return <SettingsScreen />;
+    default: {
+      const _exhaustive: never = current;
+      throw new Error(`Unhandled screen: ${(_exhaustive as Screen).name}`);
+    }
   }
 }
 
@@ -49,7 +54,10 @@ function AppShell() {
   if (error) return <div className="p-6 text-center text-red-600">{error}</div>;
   if (sessionReplaced) {
     return (
-      <div className="p-6 text-center">Bu sessiya boshqa qurilmada ochildi.</div>
+      <div className="flex flex-col items-center gap-4 p-6 text-center">
+        <p>Bu sessiya boshqa qurilmada ochildi.</p>
+        <PrimaryButton onClick={() => window.location.reload()}>Qayta yuklash</PrimaryButton>
+      </div>
     );
   }
 
