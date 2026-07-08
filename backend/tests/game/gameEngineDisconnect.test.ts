@@ -7,7 +7,18 @@ import { randomUUID } from 'crypto';
 
 function createFakeIO() {
   const events: { room: string; event: string; payload: unknown }[] = [];
+  const sockets = new Map<string, { id: string; data: Record<string, unknown> }>();
   const fakeIO = {
+    sockets: {
+      sockets: {
+        get(id: string) {
+          if (!sockets.has(id)) {
+            sockets.set(id, { id, data: {} });
+          }
+          return sockets.get(id);
+        },
+      },
+    },
     to(room: string) {
       return {
         emit(event: string, payload: unknown) {
@@ -16,7 +27,7 @@ function createFakeIO() {
       };
     },
   };
-  return { fakeIO, events };
+  return { fakeIO, events, sockets };
 }
 
 // jest.advanceTimersByTime() only fires the due setTimeout callback
@@ -91,11 +102,14 @@ describe('gameEngine disconnect/reconnect handling', () => {
   });
 
   it('forfeits a player who does not reconnect within the grace period', async () => {
-    const { fakeIO, events } = createFakeIO();
+    const { fakeIO, events, sockets } = createFakeIO();
     setIOForTesting(fakeIO as any);
 
     const gameId = randomUUID();
     await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' });
+    // Mirror matchmaker.ts's real behavior on match start.
+    fakeIO.sockets.sockets.get('sock1')!.data.gameId = gameId;
+    fakeIO.sockets.sockets.get('sock2')!.data.gameId = gameId;
 
     await handleDisconnect(gameId, player1Id);
     jest.advanceTimersByTime(10_000);
@@ -106,6 +120,19 @@ describe('gameEngine disconnect/reconnect handling', () => {
     const payload = gameOverEvent!.payload as { winnerId: number; forfeited: boolean };
     expect(payload.winnerId).toBe(player2Id);
     expect(payload.forfeited).toBe(true);
+
+    // Regression: forfeitIfStillDisconnected must clear socket.data.gameId
+    // for both players too, same as the natural-finish path in finishGame -
+    // otherwise a player whose match ends via forfeit (opponent disappeared)
+    // would be permanently unable to join_queue again on that same socket.
+    // waitUntil (not just the game_over event check above) is required here:
+    // the emit happens partway through forfeitIfStillDisconnected, BEFORE
+    // the later persistMatchResult/clearSocketGameId/deleteGame awaits - so
+    // "game_over is in the events array" does not by itself guarantee the
+    // rest of that async function has finished running yet.
+    await waitUntil(() => sockets.get('sock1')!.data.gameId === undefined);
+    expect(sockets.get('sock1')!.data.gameId).toBeUndefined();
+    expect(sockets.get('sock2')!.data.gameId).toBeUndefined();
   });
 
   it('cancels the forfeit if the player reconnects in time', async () => {

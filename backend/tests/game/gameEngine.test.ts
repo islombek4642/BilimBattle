@@ -8,7 +8,18 @@ import { randomUUID } from 'crypto';
 
 function createFakeIO() {
   const events: { room: string; event: string; payload: unknown }[] = [];
+  const sockets = new Map<string, { id: string; data: Record<string, unknown> }>();
   const fakeIO = {
+    sockets: {
+      sockets: {
+        get(id: string) {
+          if (!sockets.has(id)) {
+            sockets.set(id, { id, data: {} });
+          }
+          return sockets.get(id);
+        },
+      },
+    },
     to(room: string) {
       return {
         emit(event: string, payload: unknown) {
@@ -17,7 +28,7 @@ function createFakeIO() {
       };
     },
   };
-  return { fakeIO, events };
+  return { fakeIO, events, sockets };
 }
 
 describe('gameEngine full match flow', () => {
@@ -63,6 +74,37 @@ describe('gameEngine full match flow', () => {
       [player1Id, player2Id]
     );
     expect(matchRow.rows.length).toBe(1);
+  });
+
+  it('clears socket.data.gameId for both players once the match finishes, so their socket can join_queue again', async () => {
+    // Regression test: socket.data.gameId used to only ever be SET (on match
+    // start/reconnect) and never cleared, so every join_queue/create_invite/
+    // join_invite call on the same long-lived socket after a player's first
+    // game would be silently ignored forever by socketServer.ts's
+    // `if (socket.data.gameId) return;` guards - reported from live testing
+    // as "can't start a second game after the first one ends".
+    const { fakeIO, events, sockets } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    const gameId = randomUUID();
+    await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sockA' }, { userId: player2Id, socketId: 'sockB' });
+
+    // Mirror what matchmaker.ts actually does on match start, so this test
+    // observes the same before/after transition a real game does. Use the
+    // fakeIO's own lazy-creating getter (not the raw `sockets` map directly)
+    // so the entries actually exist before we set data on them.
+    fakeIO.sockets.sockets.get('sockA')!.data.gameId = gameId;
+    fakeIO.sockets.sockets.get('sockB')!.data.gameId = gameId;
+
+    for (let i = 0; i < 7; i += 1) {
+      expect(events.filter((e) => e.event === 'question')[i]).toBeDefined();
+      await submitAnswer(gameId, player1Id, 0);
+      await submitAnswer(gameId, player2Id, 1);
+    }
+
+    expect(events.find((e) => e.event === 'game_over')).toBeDefined();
+    expect(sockets.get('sockA')!.data.gameId).toBeUndefined();
+    expect(sockets.get('sockB')!.data.gameId).toBeUndefined();
   });
 
   it('ignores a second answer submission for the same question', async () => {

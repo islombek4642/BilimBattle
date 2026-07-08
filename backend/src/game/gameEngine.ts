@@ -175,6 +175,24 @@ async function persistMatchResult(
   }
 }
 
+// `socket.data.gameId` is set once when a match starts (matchmaker.ts) or a
+// reconnect succeeds (socketServer.ts's reconnect_game handler), but nothing
+// ever cleared it back to undefined when the match ended - so every
+// join_queue/create_invite/join_invite call on that same long-lived socket
+// after a player's FIRST game would be silently ignored forever by the
+// `if (socket.data.gameId) return;` guards in socketServer.ts, since the
+// socket still looked like it was "in an active game" that no longer
+// existed. This is called from every path that ends a game (finishGame,
+// forfeitIfStillDisconnected) so a player's socket becomes queueable again
+// the moment their match is actually over. Bot "sockets" (socketId: 'bot')
+// simply resolve to `undefined` here and are skipped harmlessly.
+function clearSocketGameId(players: { socketId: string }[]): void {
+  for (const player of players) {
+    const socket = getIO().sockets.sockets.get(player.socketId);
+    if (socket) socket.data.gameId = undefined;
+  }
+}
+
 async function finishGame(gameId: string): Promise<void> {
   const game = await getGame(gameId);
   if (!game) return;
@@ -201,6 +219,7 @@ async function finishGame(gameId: string): Promise<void> {
   if (timer) clearTimeout(timer);
   activeTimers.delete(gameId);
 
+  clearSocketGameId(game.players);
   await deleteGame(gameId);
 }
 
@@ -364,5 +383,6 @@ async function forfeitIfStillDisconnected(gameId: string, userId: number, versio
     winnerId: opponent.userId,
   });
 
+  clearSocketGameId(game.players);
   await deleteGame(gameId);
 }
