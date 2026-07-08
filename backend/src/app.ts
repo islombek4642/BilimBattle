@@ -8,6 +8,7 @@ import { env } from './config/env';
 
 export function createApp() {
   const app = express();
+  app.get('/health', (_req, res) => res.json({ status: 'ok' }));
   app.use(cors({ origin: env.webappUrl }));
   app.use(express.json());
   app.use('/api', authRouter);
