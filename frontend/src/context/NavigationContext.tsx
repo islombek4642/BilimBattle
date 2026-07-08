@@ -10,7 +10,8 @@ export type Screen =
   | { name: 'battle'; gameId: string }
   | { name: 'result'; scores: ScoreEntry[]; winnerId: number | null; forfeited: boolean }
   | { name: 'leaderboard' }
-  | { name: 'settings' };
+  | { name: 'settings' }
+  | { name: 'admin' };
 
 interface NavigationContextValue {
   current: Screen;

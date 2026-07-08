@@ -28,4 +28,9 @@ export const env = {
   // failure) when this is unset, so existing deployments that predate the
   // dashboard don't need to add it just to keep running.
   adminPassword: process.env.ADMIN_PASSWORD,
+  // Same value scripts/healthcheck-alert.sh reads directly from .env for its
+  // Telegram DMs - reused here to gate the in-app admin dashboard
+  // (/api/admin/stats) to that one Telegram account. Optional: unset means
+  // nobody can access it (never matches a real telegramId).
+  adminTelegramId: process.env.ADMIN_TELEGRAM_ID ? Number(process.env.ADMIN_TELEGRAM_ID) : undefined,
 };

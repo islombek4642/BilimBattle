@@ -3,6 +3,7 @@ import { verifySession } from './jwt';
 
 export interface AuthenticatedRequest extends Request {
   userId?: number;
+  telegramId?: number;
 }
 
 export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
@@ -18,5 +19,6 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
     return;
   }
   req.userId = payload.userId;
+  req.telegramId = payload.telegramId;
   next();
 }

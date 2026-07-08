@@ -1,12 +1,18 @@
 // frontend/src/screens/SettingsScreen.tsx
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigation } from '../context/NavigationContext';
 import { getMyStats } from '../api/stats';
 import { Stats } from '../api/types';
 import { SOUND_KEY, isSoundEnabled } from '../utils/settings';
 
 export function SettingsScreen() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const { navigate } = useNavigation();
+  const adminTelegramId = import.meta.env.VITE_ADMIN_TELEGRAM_ID
+    ? Number(import.meta.env.VITE_ADMIN_TELEGRAM_ID)
+    : null;
+  const isAdmin = adminTelegramId !== null && user?.telegramId === adminTelegramId;
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -99,6 +105,16 @@ export function SettingsScreen() {
             </div>
           ))}
         </div>
+      )}
+
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={() => navigate({ name: 'admin' })}
+          className="rounded-2xl bg-ios-card px-4 py-3.5 text-left font-medium text-ios-blue shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]"
+        >
+          Admin statistikasi
+        </button>
       )}
     </div>
   );

@@ -12,6 +12,7 @@ import { BattleScreen } from './screens/BattleScreen';
 import { ResultScreen } from './screens/ResultScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { AdminScreen } from './screens/AdminScreen';
 import { readyWebApp, getStartParam } from './telegram/webApp';
 
 function Router() {
@@ -34,6 +35,8 @@ function Router() {
       return <LeaderboardScreen />;
     case 'settings':
       return <SettingsScreen />;
+    case 'admin':
+      return <AdminScreen />;
     default: {
       const _exhaustive: never = current;
       throw new Error(`Unhandled screen: ${(_exhaustive as Screen).name}`);

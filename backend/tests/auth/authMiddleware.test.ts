@@ -28,4 +28,16 @@ describe('requireAuth middleware', () => {
     expect(res.status).toBe(200);
     expect(res.body.userId).toBe(42);
   });
+
+  it('also attaches telegramId from the session payload', async () => {
+    const app = express();
+    app.get('/protected', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+      res.json({ telegramId: req.telegramId });
+    });
+
+    const token = signSession({ userId: 42, telegramId: 999 });
+    const res = await request(app).get('/protected').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.telegramId).toBe(999);
+  });
 });

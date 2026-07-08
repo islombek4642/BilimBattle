@@ -3,14 +3,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SettingsScreen } from './SettingsScreen';
 import * as authContext from '../context/AuthContext';
+import * as navigationContext from '../context/NavigationContext';
 import * as statsApi from '../api/stats';
 
 describe('SettingsScreen', () => {
+  const navigate = vi.fn();
+
   beforeEach(() => {
     vi.restoreAllMocks();
     localStorage.clear();
+    navigate.mockClear();
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
-      token: 'tok', user: { id: 1 } as any, loading: false, error: null,
+      token: 'tok', user: { id: 1, telegramId: 111 } as any, loading: false, error: null,
+    });
+    vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({
+      current: { name: 'settings' },
+      navigate, goBack: vi.fn(), replace: vi.fn(), reset: vi.fn(),
     });
   });
 
@@ -108,5 +116,30 @@ describe('SettingsScreen', () => {
     render(<SettingsScreen />);
 
     await waitFor(() => expect(screen.getByText(/Statistikani yuklab bo'lmadi/)).toBeInTheDocument());
+  });
+
+  it('does not show the admin entry point for a non-admin user', async () => {
+    vi.stubEnv('VITE_ADMIN_TELEGRAM_ID', '999');
+    vi.spyOn(statsApi, 'getMyStats').mockResolvedValue({
+      gamesPlayed: 0, gamesWon: 0, winRate: 0, currentStreak: 0, bestStreak: 0, rating: 1000,
+    });
+
+    render(<SettingsScreen />); // mocked user.telegramId is 111, not 999
+
+    expect(screen.queryByText('Admin statistikasi')).not.toBeInTheDocument();
+  });
+
+  it("shows the admin entry point and navigates to 'admin' when the logged-in user's telegramId matches VITE_ADMIN_TELEGRAM_ID", async () => {
+    vi.stubEnv('VITE_ADMIN_TELEGRAM_ID', '111');
+    vi.spyOn(statsApi, 'getMyStats').mockResolvedValue({
+      gamesPlayed: 0, gamesWon: 0, winRate: 0, currentStreak: 0, bestStreak: 0, rating: 1000,
+    });
+
+    render(<SettingsScreen />); // mocked user.telegramId is 111, matches
+
+    const button = screen.getByText('Admin statistikasi');
+    fireEvent.click(button);
+
+    expect(navigate).toHaveBeenCalledWith({ name: 'admin' });
   });
 });

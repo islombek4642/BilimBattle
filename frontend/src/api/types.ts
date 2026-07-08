@@ -38,3 +38,24 @@ export interface ScoreEntry {
   userId: number;
   score: number;
 }
+
+export interface AdminSummary {
+  totalUsers: number;
+  invitedUsers: number;
+  totalHumanMatches: number;
+  totalBotMatches: number;
+  returningUsers: number;
+}
+
+export interface AdminDailyStat {
+  date: string;
+  newUsers: number;
+  activeUsers: number;
+  humanMatches: number;
+  botMatches: number;
+}
+
+export interface AdminStats {
+  summary: AdminSummary;
+  daily: AdminDailyStat[];
+}

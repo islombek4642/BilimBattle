@@ -72,6 +72,7 @@ services:
         VITE_API_URL: https://${API_DOMAIN}/api
         VITE_SOCKET_URL: https://${API_DOMAIN}
         VITE_BOT_USERNAME: ${BOT_USERNAME}
+        VITE_ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
     container_name: bilimbattle_frontend
     restart: on-failure:5
     environment:
