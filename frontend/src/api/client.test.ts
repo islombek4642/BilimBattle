@@ -1,6 +1,6 @@
 // frontend/src/api/client.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { apiGet, apiPost, ApiError } from './client';
+import { apiGet, apiPost, ApiError, getAvatarUrl } from './client';
 
 describe('api/client', () => {
   beforeEach(() => {
@@ -74,5 +74,9 @@ describe('api/client', () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(0);
+  });
+
+  it('getAvatarUrl builds the avatar endpoint URL for a telegramId', () => {
+    expect(getAvatarUrl(12345)).toBe('http://localhost:3000/api/users/12345/avatar');
   });
 });

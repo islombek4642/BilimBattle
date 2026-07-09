@@ -1,6 +1,10 @@
 // frontend/src/api/client.ts
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 
+export function getAvatarUrl(telegramId: number): string {
+  return `${API_URL}/users/${telegramId}/avatar`;
+}
+
 export class ApiError extends Error {
   status: number;
 
