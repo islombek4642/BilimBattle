@@ -205,4 +205,35 @@ describe('useGameSocket', () => {
 
     expect(resolved).toBe('timeout');
   });
+
+  it('does not read ack.opponent (and so cannot call setOpponent) from a late reconnect_game ack that arrives after unmount', async () => {
+    const { result, unmount } = renderHook(() => useGameSocket('tok'));
+
+    let capturedAck: ((response: any) => void) | undefined;
+    fakeSocket.emit.mockImplementation((event: string, _payload: any, ack: any) => {
+      if (event === 'reconnect_game') {
+        capturedAck = ack;
+      }
+    });
+
+    result.current.reconnectGame('game-1');
+    unmount();
+
+    // Trap access to `opponent` on the stale ack payload. The epoch guard
+    // (`if (epochRef.current !== requestEpoch) return;`) must run BEFORE
+    // `if (ack.opponent) setOpponent(ack.opponent);` - if it ran after
+    // instead, `ack.opponent` would be read (and setOpponent called with it)
+    // regardless of the stale epoch. Reading the getter is a direct proxy
+    // for "the code reached past the guard", which is a more reliable signal
+    // than relying on a React unmounted-component warning (React 19 no
+    // longer logs one for this case).
+    const opponentGetter = vi.fn(() => ({ telegramId: 1, firstName: 'X' }));
+    const staleAck: any = { found: true, currentQuestionIndex: 3, scores: [] };
+    Object.defineProperty(staleAck, 'opponent', { get: opponentGetter, enumerable: true });
+
+    // Ack arrives AFTER unmount and carries an opponent.
+    capturedAck?.(staleAck);
+
+    expect(opponentGetter).not.toHaveBeenCalled();
+  });
 });
