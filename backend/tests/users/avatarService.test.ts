@@ -88,5 +88,8 @@ describe('avatarService', () => {
 
     const result = await getAvatarBuffer(telegramId);
     expect(result).toBeNull();
+
+    const cached = await redis.getBuffer(`avatar:${telegramId}`);
+    expect(cached).toBeNull();
   });
 });

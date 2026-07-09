@@ -41,40 +41,51 @@ export async function getAvatarBuffer(telegramId: number): Promise<Buffer | null
     return cached.length === 0 ? null : cached;
   }
 
-  const buffer = await fetchAvatarFromTelegram(telegramId);
-  await redis.set(avatarCacheKey(telegramId), buffer ?? NO_PHOTO_SENTINEL, 'EX', AVATAR_CACHE_TTL_SECONDS);
-  return buffer;
-}
-
-async function fetchAvatarFromTelegram(telegramId: number): Promise<Buffer | null> {
   try {
-    const photosRes = await fetch(
-      `https://api.telegram.org/bot${env.telegramBotToken}/getUserProfilePhotos?user_id=${telegramId}&limit=1`
-    );
-    const photosBody = (await photosRes.json()) as TelegramApiResponse<TelegramUserProfilePhotos>;
-    if (!photosBody.ok || !photosBody.result || photosBody.result.photos.length === 0) return null;
-
-    const sizes = photosBody.result.photos[0];
-    const largest = sizes[sizes.length - 1];
-
-    const fileRes = await fetch(
-      `https://api.telegram.org/bot${env.telegramBotToken}/getFile?file_id=${largest.file_id}`
-    );
-    const fileBody = (await fileRes.json()) as TelegramApiResponse<TelegramFile>;
-    if (!fileBody.ok || !fileBody.result?.file_path) return null;
-
-    // Deliberately fetched server-side and returned as raw bytes below -
-    // this URL embeds our bot token, so it must never reach the client (no
-    // redirecting the browser here).
-    const downloadRes = await fetch(
-      `https://api.telegram.org/file/bot${env.telegramBotToken}/${fileBody.result.file_path}`
-    );
-    if (!downloadRes.ok) return null;
-
-    const arrayBuffer = await downloadRes.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    const buffer = await fetchAvatarFromTelegram(telegramId);
+    await redis.set(avatarCacheKey(telegramId), buffer ?? NO_PHOTO_SENTINEL, 'EX', AVATAR_CACHE_TTL_SECONDS);
+    return buffer;
   } catch (err) {
     console.error(`avatarService: failed to fetch avatar for telegramId ${telegramId}`, err);
-    return null;
+    return null; // Not cached - a transient failure should not look like a confirmed "no photo" for 24h.
   }
+}
+
+// Returns null ONLY for a confirmed "no photo" response from Telegram (the
+// caller negative-caches that). Any other problem (API error, failed
+// download, network error, malformed response) THROWS instead, so
+// getAvatarBuffer's catch above can treat it as transient and skip caching.
+async function fetchAvatarFromTelegram(telegramId: number): Promise<Buffer | null> {
+  const photosRes = await fetch(
+    `https://api.telegram.org/bot${env.telegramBotToken}/getUserProfilePhotos?user_id=${telegramId}&limit=1`
+  );
+  const photosBody = (await photosRes.json()) as TelegramApiResponse<TelegramUserProfilePhotos>;
+  if (!photosBody.ok || !photosBody.result) {
+    throw new Error(`getUserProfilePhotos failed for telegramId ${telegramId}`);
+  }
+  if (photosBody.result.photos.length === 0) return null;
+
+  const sizes = photosBody.result.photos[0];
+  const largest = sizes[sizes.length - 1];
+
+  const fileRes = await fetch(
+    `https://api.telegram.org/bot${env.telegramBotToken}/getFile?file_id=${largest.file_id}`
+  );
+  const fileBody = (await fileRes.json()) as TelegramApiResponse<TelegramFile>;
+  if (!fileBody.ok || !fileBody.result?.file_path) {
+    throw new Error(`getFile failed for telegramId ${telegramId}`);
+  }
+
+  // Deliberately fetched server-side and returned as raw bytes below -
+  // this URL embeds our bot token, so it must never reach the client (no
+  // redirecting the browser here).
+  const downloadRes = await fetch(
+    `https://api.telegram.org/file/bot${env.telegramBotToken}/${fileBody.result.file_path}`
+  );
+  if (!downloadRes.ok) {
+    throw new Error(`Telegram file download failed with status ${downloadRes.status} for telegramId ${telegramId}`);
+  }
+
+  const arrayBuffer = await downloadRes.arrayBuffer();
+  return Buffer.from(arrayBuffer);
 }
