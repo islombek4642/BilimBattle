@@ -184,6 +184,41 @@ describe('BattleScreen', () => {
     expect(screen.getByText('Vali')).toBeInTheDocument();
   });
 
+  it('keeps showing the latest real scores in the header after questionResult resets to null for the next question', () => {
+    // Regression test: restoredScores previously only ever got ONE snapshot
+    // (from the reconnect ack, taken near the very start of the match) and
+    // was never updated again. useGameSocket resets questionResult to null
+    // the instant the next `question` event arrives, so for the whole time
+    // a question is being answered, the header fell back to that stale
+    // near-zero snapshot instead of the actual running score - the
+    // tug-of-war bar looked permanently stuck near 50/50 except for a brief
+    // flash right after each question resolved.
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Q1?', options: ['A', 'B'], timeLimitMs: 10000 },
+    });
+    const { rerender } = render(<BattleScreen gameId="g1" />);
+
+    // Question 0 resolves with a real, lopsided score.
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Q1?', options: ['A', 'B'], timeLimitMs: 10000 },
+      questionResult: { index: 0, correctIndex: 0, scores: [{ userId: 1, score: 300 }, { userId: 2, score: 0 }] },
+    });
+    rerender(<BattleScreen gameId="g1" />);
+    expect(screen.getByTestId('tugofwar-blue')).toHaveStyle({ width: '80%' });
+
+    // Question 1 starts - questionResult resets to null (useGameSocket's
+    // real behavior), the way it would just before the next question is
+    // answered. The header must keep reflecting the 300-0 score, not revert
+    // to a 0-0 tie.
+    mockSocket({
+      question: { index: 1, total: 7, text: 'Q2?', options: ['A', 'B'], timeLimitMs: 10000 },
+      questionResult: null,
+    });
+    rerender(<BattleScreen gameId="g1" />);
+
+    expect(screen.getByTestId('tugofwar-blue')).toHaveStyle({ width: '80%' });
+  });
+
   it('clears opponent on unmount', () => {
     mockSocket({
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },

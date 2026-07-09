@@ -58,6 +58,24 @@ export function BattleScreen({ gameId }: { gameId: string }) {
     }
   }, [connected, gameId, reconnectGame]);
 
+  // Without this, restoredScores only ever gets its ONE snapshot from the
+  // reconnect ack above (taken once, near the very start of the match) and
+  // never updates again. Every question, useGameSocket resets
+  // questionResult to null the instant the NEXT `question` event arrives
+  // (see its 'question' listener) - so for the entire time a question is
+  // being answered (the bulk of a match's real duration), BattleHeader was
+  // falling back to that stale, near-zero initial snapshot instead of the
+  // actual running score, making the tug-of-war bar look permanently stuck
+  // near 50/50 except for a brief flash right after each question resolves.
+  // Keeping restoredScores in sync with the latest questionResult here means
+  // the fallback value shown between questions is always the most recent
+  // real score, not the match's starting score.
+  useEffect(() => {
+    if (questionResult) {
+      setRestoredScores(questionResult.scores);
+    }
+  }, [questionResult]);
+
   // `GameSocketProvider` sits above `NavigationProvider`, so `question`/
   // `questionResult`/`gameOver` all persist in context across screens. The
   // `gameOver` branch above already clears itself (and `questionResult`)
