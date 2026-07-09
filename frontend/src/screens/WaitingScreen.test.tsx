@@ -70,11 +70,27 @@ describe('WaitingScreen', () => {
   });
 
   it('shows a "VS" reveal with both names when matchFound arrives, then replaces with battle after the reveal delay', () => {
+    // Regression test: mounting with matchFound ALREADY set (as a previous
+    // version of this test did) does not reproduce the real production bug,
+    // because there was no prior render for React to diff against - the
+    // bug only manifested on the TRANSITION from matchFound=null to a real
+    // value (i.e. the socket event arriving after the screen is already
+    // showing). Using rerender() here to simulate that real transition is
+    // what actually caught the bug: an earlier version of WaitingScreen
+    // cleared matchFound back to null as a side effect of the SAME render
+    // that set showVs=true, so the reveal-timer effect's
+    // `if (!showVs || !matchFound) return;` guard never saw both flags true
+    // at once - the VS screen displayed correctly (opponent state is
+    // separate and unaffected) but `replace` was never called, leaving both
+    // players stuck on the VS screen forever.
+    mockSocket();
+    const { rerender } = render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
+
     mockSocket({
       matchFound: { gameId: 'g1', category: 'umumiy_bilim', opponent: { telegramId: 999, firstName: 'Vali' } } as any,
       opponent: { telegramId: 999, firstName: 'Vali' },
     });
-    render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
+    rerender(<WaitingScreen category="umumiy_bilim" intent="quick" />);
 
     expect(screen.getByText('VS')).toBeInTheDocument();
     expect(screen.getByText('Aziz')).toBeInTheDocument();

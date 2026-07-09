@@ -37,22 +37,39 @@ export function WaitingScreen({
     if (matchFound) {
       setShowVs(true);
     }
-    // `GameSocketProvider` sits above `NavigationProvider`, so `matchFound`/
-    // `inviteCreated`/`inviteExpired` persist across mount/unmount as the
-    // user navigates between screens. Without this cleanup, a match that
-    // lands right as the user cancels (leave_queue is fire-and-forget, no
-    // ack) would sit in state and get picked up as stale data the next time
-    // this screen mounts for an unrelated queue/invite. `opponent` is
-    // deliberately NOT cleared here - it needs to survive into BattleScreen
-    // (see BattleScreen's own unmount cleanup for where it's cleared).
-    // clearMatchFound/clearInviteCreated/clearInviteExpired are all
-    // idempotent, so this is safe to run unconditionally on unmount.
+  }, [matchFound]);
+
+  // `GameSocketProvider` sits above `NavigationProvider`, so `matchFound`/
+  // `inviteCreated`/`inviteExpired` persist across mount/unmount as the user
+  // navigates between screens. Without this cleanup, a match that lands
+  // right as the user cancels (leave_queue is fire-and-forget, no ack) would
+  // sit in state and get picked up as stale data the next time this screen
+  // mounts for an unrelated queue/invite. `opponent` is deliberately NOT
+  // cleared here - it needs to survive into BattleScreen (see BattleScreen's
+  // own unmount cleanup for where it's cleared).
+  //
+  // This MUST be its own effect with a stable (never-changing) dependency
+  // array, not folded into the effect above. clearMatchFound/etc are stable
+  // useCallback references, so this cleanup only fires on true unmount. If
+  // `matchFound` were a dependency here (as it was in an earlier, buggy
+  // version), React would run this cleanup on every `matchFound` CHANGE, not
+  // just unmount - immediately clearing `matchFound` back to null the
+  // instant it arrives, before the VS-reveal timer effect below ever gets a
+  // render where `showVs` and `matchFound` are both truthy at once. The
+  // symptom in production was a match that paired successfully (VS screen
+  // showed real names/photos) but never advanced to the battle screen -
+  // stuck on VS forever, because the timer's guard condition never passed.
+  // Confirmed via a real (non-mocked) GameSocketProvider + fake-socket
+  // integration test - the mocked-context unit test alone did not catch
+  // this, since a static mock's clearMatchFound() has no reactive effect on
+  // the next render the way the real hook's state setter does.
+  useEffect(() => {
     return () => {
       clearMatchFound();
       clearInviteCreated();
       clearInviteExpired();
     };
-  }, [matchFound, clearMatchFound, clearInviteCreated, clearInviteExpired]);
+  }, [clearMatchFound, clearInviteCreated, clearInviteExpired]);
 
   useEffect(() => {
     if (!showVs || !matchFound) return;
