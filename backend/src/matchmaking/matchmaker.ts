@@ -159,8 +159,10 @@ export async function createMatch(
   const gameId = randomUUID();
 
   const socket1 = io.sockets.sockets.get(player1.socketId);
-  socket1?.join(gameId);
-  if (socket1) socket1.data.gameId = gameId;
+  if (socket1) {
+    socket1.join(gameId);
+    socket1.data.gameId = gameId;
+  }
 
   const socket2 = player2.socketId !== 'bot' ? io.sockets.sockets.get(player2.socketId) : undefined;
   if (socket2) {
@@ -185,9 +187,11 @@ export async function createMatch(
       category,
       opponent: {
         telegramId: player2User.telegramId,
-        firstName: player2IsBot ? (botDisplayName ?? player2User.firstName) : player2User.firstName,
+        firstName: botDisplayName ?? player2User.firstName,
       },
     });
+  } else if (socket1) {
+    console.error(`matchmaker: missing user record for player2 userId=${player2.userId} - skipping match_found emit to player1 (gameId=${gameId})`);
   }
   if (socket2 && player1User) {
     socket2.emit('match_found', {
@@ -195,6 +199,8 @@ export async function createMatch(
       category,
       opponent: { telegramId: player1User.telegramId, firstName: player1User.firstName },
     });
+  } else if (socket2) {
+    console.error(`matchmaker: missing user record for player1 userId=${player1.userId} - skipping match_found emit to player2 (gameId=${gameId})`);
   }
 
   await startGame(gameId, category, player1, { ...player2, isBot: player2IsBot }, botDisplayName);
