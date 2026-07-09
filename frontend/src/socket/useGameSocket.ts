@@ -24,15 +24,22 @@ export interface GameOverPayload {
   forfeited?: boolean;
 }
 
+export interface OpponentInfo {
+  telegramId: number;
+  firstName: string;
+}
+
 export interface MatchFoundPayload {
   gameId: string;
   category: string;
+  opponent: OpponentInfo;
 }
 
 export interface ReconnectAck {
   found: boolean;
   currentQuestionIndex?: number;
   scores?: ScoreEntry[];
+  opponent?: OpponentInfo;
 }
 
 // Socket.io's own built-in lifecycle events ('connect'/'disconnect') are
@@ -62,6 +69,7 @@ export interface ClientToServerEvents {
 export interface UseGameSocketResult {
   connected: boolean;
   matchFound: MatchFoundPayload | null;
+  opponent: OpponentInfo | null;
   question: QuestionPayload | null;
   questionResult: QuestionResultPayload | null;
   gameOver: GameOverPayload | null;
@@ -75,6 +83,7 @@ export interface UseGameSocketResult {
   joinInvite: (inviterTelegramId: number, category: string) => void;
   reconnectGame: (gameId: string) => Promise<ReconnectAck>;
   clearMatchFound: () => void;
+  clearOpponent: () => void;
   clearQuestion: () => void;
   clearQuestionResult: () => void;
   clearGameOver: () => void;
@@ -95,6 +104,7 @@ export function useGameSocket(token: string | null): UseGameSocketResult {
   const epochRef = useRef(0);
   const [connected, setConnected] = useState(false);
   const [matchFound, setMatchFound] = useState<MatchFoundPayload | null>(null);
+  const [opponent, setOpponent] = useState<OpponentInfo | null>(null);
   const [question, setQuestion] = useState<QuestionPayload | null>(null);
   const [questionResult, setQuestionResult] = useState<QuestionResultPayload | null>(null);
   const [gameOver, setGameOver] = useState<GameOverPayload | null>(null);
@@ -111,7 +121,10 @@ export function useGameSocket(token: string | null): UseGameSocketResult {
 
     socket.on('connect', () => setConnected(true));
     socket.on('disconnect', () => setConnected(false));
-    socket.on('match_found', (payload: MatchFoundPayload) => setMatchFound(payload));
+    socket.on('match_found', (payload: MatchFoundPayload) => {
+      setMatchFound(payload);
+      setOpponent(payload.opponent);
+    });
     socket.on('question', (payload: QuestionPayload) => {
       setQuestion(payload);
       setQuestionResult(null);
@@ -172,12 +185,14 @@ export function useGameSocket(token: string | null): UseGameSocketResult {
         // hand a stale result to a caller that may no longer exist, or race
         // with state belonging to the new socket. Just drop it.
         if (epochRef.current !== requestEpoch) return;
+        if (ack.opponent) setOpponent(ack.opponent);
         resolve(ack);
       });
     });
   }, []);
 
   const clearMatchFound = useCallback(() => setMatchFound(null), []);
+  const clearOpponent = useCallback(() => setOpponent(null), []);
   const clearQuestion = useCallback(() => setQuestion(null), []);
   const clearQuestionResult = useCallback(() => setQuestionResult(null), []);
   const clearGameOver = useCallback(() => setGameOver(null), []);
@@ -187,6 +202,7 @@ export function useGameSocket(token: string | null): UseGameSocketResult {
   return {
     connected,
     matchFound,
+    opponent,
     question,
     questionResult,
     gameOver,
@@ -200,6 +216,7 @@ export function useGameSocket(token: string | null): UseGameSocketResult {
     joinInvite,
     reconnectGame,
     clearMatchFound,
+    clearOpponent,
     clearQuestion,
     clearQuestionResult,
     clearGameOver,

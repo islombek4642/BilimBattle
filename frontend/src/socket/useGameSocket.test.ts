@@ -51,8 +51,17 @@ describe('useGameSocket', () => {
   it('exposes match_found, question, question_result, and game_over payloads as they arrive', async () => {
     const { result } = renderHook(() => useGameSocket('tok'));
 
-    act(() => fakeSocket.__trigger('match_found', { gameId: 'g1', category: 'umumiy_bilim' }));
-    await waitFor(() => expect(result.current.matchFound).toEqual({ gameId: 'g1', category: 'umumiy_bilim' }));
+    act(() =>
+      fakeSocket.__trigger('match_found', {
+        gameId: 'g1', category: 'umumiy_bilim', opponent: { telegramId: 999, firstName: 'Vali' },
+      })
+    );
+    await waitFor(() =>
+      expect(result.current.matchFound).toEqual({
+        gameId: 'g1', category: 'umumiy_bilim', opponent: { telegramId: 999, firstName: 'Vali' },
+      })
+    );
+    expect(result.current.opponent).toEqual({ telegramId: 999, firstName: 'Vali' });
 
     act(() =>
       fakeSocket.__trigger('question', {
@@ -137,6 +146,34 @@ describe('useGameSocket', () => {
 
     expect(fakeSocket.emit).toHaveBeenCalledWith('reconnect_game', { gameId: 'game-1' }, expect.any(Function));
     expect(ack).toEqual({ found: true, currentQuestionIndex: 3, scores: [] });
+  });
+
+  it('sets opponent from a reconnect_game ack when it includes one', async () => {
+    const { result } = renderHook(() => useGameSocket('tok'));
+
+    fakeSocket.emit.mockImplementation((event: string, _payload: any, ack: any) => {
+      if (event === 'reconnect_game') {
+        ack({ found: true, currentQuestionIndex: 2, scores: [], opponent: { telegramId: 42, firstName: 'Aziz' } });
+      }
+    });
+
+    await result.current.reconnectGame('game-1');
+
+    await waitFor(() => expect(result.current.opponent).toEqual({ telegramId: 42, firstName: 'Aziz' }));
+  });
+
+  it('clearOpponent resets opponent to null', async () => {
+    const { result } = renderHook(() => useGameSocket('tok'));
+
+    act(() =>
+      fakeSocket.__trigger('match_found', {
+        gameId: 'g1', category: 'umumiy_bilim', opponent: { telegramId: 999, firstName: 'Vali' },
+      })
+    );
+    await waitFor(() => expect(result.current.opponent).not.toBeNull());
+
+    act(() => result.current.clearOpponent());
+    expect(result.current.opponent).toBeNull();
   });
 
   it('disconnects the socket on unmount', () => {
