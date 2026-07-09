@@ -36,4 +36,22 @@ describe('GET /users/:telegramId/avatar', () => {
     expect(res.status).toBe(404);
     expect(spy).not.toHaveBeenCalled();
   });
+
+  it('returns 404 for a negative telegramId without calling the service', async () => {
+    const spy = jest.spyOn(avatarService, 'getAvatarBuffer');
+
+    const res = await request(app).get('/users/-5/avatar');
+
+    expect(res.status).toBe(404);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a decimal/scientific-notation telegramId without calling the service', async () => {
+    const spy = jest.spyOn(avatarService, 'getAvatarBuffer');
+
+    const res = await request(app).get('/users/1e3/avatar');
+
+    expect(res.status).toBe(404);
+    expect(spy).not.toHaveBeenCalled();
+  });
 });

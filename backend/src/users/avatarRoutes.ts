@@ -10,11 +10,12 @@ import { getAvatarBuffer } from './avatarService';
 export const avatarRouter = Router();
 
 avatarRouter.get('/users/:telegramId/avatar', async (req, res) => {
-  const telegramId = Number(req.params.telegramId);
-  if (!Number.isFinite(telegramId)) {
+  const rawTelegramId = req.params.telegramId;
+  if (!/^\d+$/.test(rawTelegramId)) {
     res.status(404).end();
     return;
   }
+  const telegramId = Number(rawTelegramId);
 
   const buffer = await getAvatarBuffer(telegramId);
   if (!buffer) {
