@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getAdminStats } from '../api/admin';
+import { openTelegramProfile } from '../telegram/webApp';
 import { AdminStats } from '../api/types';
 
 export function AdminScreen() {
@@ -52,7 +53,7 @@ export function AdminScreen() {
     );
   }
 
-  const { summary, daily } = stats;
+  const { summary, daily, users } = stats;
   const invitedPct = summary.totalUsers === 0 ? 0 : Math.round((summary.invitedUsers / summary.totalUsers) * 100);
   const returningPct = summary.totalUsers === 0 ? 0 : Math.round((summary.returningUsers / summary.totalUsers) * 100);
 
@@ -103,6 +104,34 @@ export function AdminScreen() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-2xl bg-ios-card p-2 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
+        <h3 className="px-2 pt-2 text-sm font-semibold text-ios-label">Foydalanuvchilar</h3>
+        {users.map((u, i) => {
+          const clickable = u.username !== null;
+          return (
+            <button
+              key={u.telegramId}
+              type="button"
+              disabled={!clickable}
+              onClick={() => u.username && openTelegramProfile(u.username)}
+              className={`flex items-center justify-between rounded-xl px-3 py-3 text-left ${
+                i < users.length - 1 ? 'border-b border-ios-divider' : ''
+              } ${clickable ? 'text-ios-blue' : 'text-ios-label'}`}
+            >
+              <span className="flex flex-col">
+                <span className="font-medium">{u.firstName}</span>
+                <span className="text-xs text-ios-secondary-label">
+                  {u.username ? `@${u.username}` : "username yo'q"}
+                </span>
+              </span>
+              <span className="text-xs tabular-nums text-ios-secondary-label">
+                {u.rating} · {u.gamesPlayed} o'yin
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

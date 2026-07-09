@@ -1,13 +1,13 @@
 import { pool } from '../../src/config/db';
 import { upsertUser, recordMatchResult, getOrCreateBotUser } from '../../src/users/userRepository';
-import { getAdminSummary, getDailyStats } from '../../src/admin/statsQueries';
+import { getAdminSummary, getDailyStats, getUserList } from '../../src/admin/statsQueries';
 
 describe('admin/statsQueries', () => {
   afterAll(async () => {
     await pool.query(
-      `DELETE FROM matches WHERE player1_id IN (SELECT id FROM users WHERE telegram_id IN (9001, 9002, 9003))`
+      `DELETE FROM matches WHERE player1_id IN (SELECT id FROM users WHERE telegram_id IN (9001, 9002, 9003, 9004))`
     );
-    await pool.query(`DELETE FROM users WHERE telegram_id IN (9001, 9002, 9003)`);
+    await pool.query(`DELETE FROM users WHERE telegram_id IN (9001, 9002, 9003, 9004)`);
     await pool.end();
   });
 
@@ -93,5 +93,25 @@ describe('admin/statsQueries', () => {
     for (let i = 1; i < daily.length; i += 1) {
       expect(daily[i - 1].date >= daily[i].date).toBe(true);
     }
+  });
+
+  it('includes a user with their username/rating/stats, and excludes the bot user', async () => {
+    await upsertUser(9004, 'clickable_handle', 'ListedUser', null);
+    await getOrCreateBotUser();
+
+    const users = await getUserList(500);
+
+    const listed = users.find((u) => u.telegramId === 9004);
+    expect(listed).toBeDefined();
+    expect(listed).toMatchObject({
+      telegramId: 9004,
+      username: 'clickable_handle',
+      firstName: 'ListedUser',
+      rating: 1000,
+      gamesPlayed: 0,
+      gamesWon: 0,
+    });
+
+    expect(users.some((u) => u.telegramId === 0)).toBe(false);
   });
 });

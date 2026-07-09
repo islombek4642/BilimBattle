@@ -72,3 +72,13 @@ export function shareInviteLink(link: string, text: string): void {
     window.open(shareUrl, '_blank');
   }
 }
+
+export function openTelegramProfile(username: string): void {
+  const profileUrl = `https://t.me/${username}`;
+  const webApp = getTelegramWebApp();
+  if (webApp) {
+    webApp.openTelegramLink(profileUrl);
+  } else {
+    window.open(profileUrl, '_blank');
+  }
+}

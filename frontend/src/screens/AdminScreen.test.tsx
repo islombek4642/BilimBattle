@@ -4,6 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { AdminScreen } from './AdminScreen';
 import * as authContext from '../context/AuthContext';
 import * as adminApi from '../api/admin';
+import * as telegram from '../telegram/webApp';
 
 describe('AdminScreen', () => {
   beforeEach(() => {
@@ -25,6 +26,7 @@ describe('AdminScreen', () => {
       daily: [
         { date: '2026-07-09', newUsers: 3, activeUsers: 12, humanMatches: 6, botMatches: 1 },
       ],
+      users: [],
     });
 
     render(<AdminScreen />);
@@ -36,6 +38,43 @@ describe('AdminScreen', () => {
     expect(screen.getByText('30')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('2026-07-09')).toBeInTheDocument();
+  });
+
+  it('opens the Telegram profile when clicking a user row with a username', async () => {
+    const openProfileSpy = vi.spyOn(telegram, 'openTelegramProfile').mockImplementation(() => {});
+    vi.spyOn(adminApi, 'getAdminStats').mockResolvedValue({
+      summary: { totalUsers: 1, invitedUsers: 0, totalHumanMatches: 0, totalBotMatches: 0, returningUsers: 0 },
+      daily: [],
+      users: [
+        { telegramId: 555, username: 'aziz_handle', firstName: 'Aziz', rating: 1000, gamesPlayed: 3, gamesWon: 1, createdAt: '2026-07-09' },
+      ],
+    });
+
+    render(<AdminScreen />);
+
+    const row = await screen.findByRole('button', { name: /Aziz/ });
+    row.click();
+
+    expect(openProfileSpy).toHaveBeenCalledWith('aziz_handle');
+  });
+
+  it('does not attempt to open a profile for a user with no username', async () => {
+    const openProfileSpy = vi.spyOn(telegram, 'openTelegramProfile').mockImplementation(() => {});
+    vi.spyOn(adminApi, 'getAdminStats').mockResolvedValue({
+      summary: { totalUsers: 1, invitedUsers: 0, totalHumanMatches: 0, totalBotMatches: 0, returningUsers: 0 },
+      daily: [],
+      users: [
+        { telegramId: 556, username: null, firstName: 'Vali', rating: 1000, gamesPlayed: 0, gamesWon: 0, createdAt: '2026-07-09' },
+      ],
+    });
+
+    render(<AdminScreen />);
+
+    const row = await screen.findByRole('button', { name: /Vali/ });
+    expect(row).toBeDisabled();
+    row.click();
+
+    expect(openProfileSpy).not.toHaveBeenCalled();
   });
 
   it("shows an error message when stats fail to load", async () => {

@@ -16,6 +16,16 @@ export interface DailyStat {
   botMatches: number;
 }
 
+export interface AdminUserEntry {
+  telegramId: number;
+  username: string | null;
+  firstName: string;
+  rating: number;
+  gamesPlayed: number;
+  gamesWon: number;
+  createdAt: string;
+}
+
 // The bot's own user row (telegram_id 0, see userRepository.ts's
 // getOrCreateBotUser) must not count toward user/DAU/retention numbers, and
 // its matches must be split out separately - a bot-fallback match is a
@@ -133,5 +143,37 @@ export async function getDailyStats(days = 14): Promise<DailyStat[]> {
     activeUsers: Number(row.active_users),
     humanMatches: Number(row.human_matches),
     botMatches: Number(row.bot_matches),
+  }));
+}
+
+// Most-recent-first, capped at `limit` - an admin-oversight list, not a
+// paginated all-time export. The bot's own row (telegram_id 0) is excluded
+// the same way it is everywhere else in this file.
+export async function getUserList(limit = 200): Promise<AdminUserEntry[]> {
+  const result = await pool.query<{
+    telegram_id: string;
+    username: string | null;
+    first_name: string;
+    rating: number;
+    games_played: number;
+    games_won: number;
+    created_at: string;
+  }>(
+    `SELECT telegram_id, username, first_name, rating, games_played, games_won, created_at
+     FROM users
+     WHERE telegram_id != 0
+     ORDER BY created_at DESC
+     LIMIT $1`,
+    [limit]
+  );
+
+  return result.rows.map((row) => ({
+    telegramId: Number(row.telegram_id),
+    username: row.username,
+    firstName: row.first_name,
+    rating: row.rating,
+    gamesPlayed: row.games_played,
+    gamesWon: row.games_won,
+    createdAt: row.created_at,
   }));
 }

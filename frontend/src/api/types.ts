@@ -55,7 +55,18 @@ export interface AdminDailyStat {
   botMatches: number;
 }
 
+export interface AdminUserEntry {
+  telegramId: number;
+  username: string | null;
+  firstName: string;
+  rating: number;
+  gamesPlayed: number;
+  gamesWon: number;
+  createdAt: string;
+}
+
 export interface AdminStats {
   summary: AdminSummary;
   daily: AdminDailyStat[];
+  users: AdminUserEntry[];
 }

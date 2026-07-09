@@ -1,15 +1,29 @@
 import { Router } from 'express';
 import { requireAdminAuth } from './adminAuth';
-import { getAdminSummary, getDailyStats, AdminSummary, DailyStat } from './statsQueries';
+import { getAdminSummary, getDailyStats, getUserList, AdminSummary, DailyStat, AdminUserEntry } from './statsQueries';
 
 export const adminRouter = Router();
 
 adminRouter.get('/admin/stats', requireAdminAuth, async (_req, res) => {
-  const [summary, daily] = await Promise.all([getAdminSummary(), getDailyStats(14)]);
-  res.set('Content-Type', 'text/html; charset=utf-8').send(renderDashboard(summary, daily));
+  const [summary, daily, users] = await Promise.all([getAdminSummary(), getDailyStats(14), getUserList()]);
+  res.set('Content-Type', 'text/html; charset=utf-8').send(renderDashboard(summary, daily, users));
 });
 
-function renderDashboard(summary: AdminSummary, daily: DailyStat[]): string {
+// firstName/username come from Telegram's initData - user-controlled text,
+// not server-generated like the date/number fields elsewhere on this page.
+// Must be escaped before interpolating into raw HTML, or a maliciously-set
+// Telegram display name becomes a stored XSS payload against whoever views
+// this admin page.
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderDashboard(summary: AdminSummary, daily: DailyStat[], users: AdminUserEntry[]): string {
   const invitedPct = summary.totalUsers === 0 ? 0 : Math.round((summary.invitedUsers / summary.totalUsers) * 100);
   const returningPct = summary.totalUsers === 0 ? 0 : Math.round((summary.returningUsers / summary.totalUsers) * 100);
 
@@ -23,6 +37,21 @@ function renderDashboard(summary: AdminSummary, daily: DailyStat[]): string {
         <td>${d.botMatches}</td>
       </tr>`
     )
+    .join('\n');
+
+  const userRows = users
+    .map((u) => {
+      const safeName = escapeHtml(u.firstName);
+      const identity = u.username
+        ? `<a href="https://t.me/${encodeURIComponent(u.username)}" target="_blank" rel="noopener noreferrer">${safeName} (@${escapeHtml(u.username)})</a>`
+        : `${safeName} (username yo'q)`;
+      return `<tr>
+        <td>${identity}</td>
+        <td>${u.rating}</td>
+        <td>${u.gamesPlayed}</td>
+        <td>${u.gamesWon}</td>
+      </tr>`;
+    })
     .join('\n');
 
   return `<!doctype html>
@@ -40,9 +69,11 @@ function renderDashboard(summary: AdminSummary, daily: DailyStat[]): string {
   .card { background: #1c1c1e; border-radius: 12px; padding: 16px 20px; min-width: 160px; }
   .card .value { font-size: 28px; font-weight: 700; }
   .card .label { font-size: 13px; color: #999; margin-top: 4px; }
-  table { border-collapse: collapse; width: 100%; max-width: 720px; }
+  table { border-collapse: collapse; width: 100%; max-width: 720px; margin-bottom: 32px; }
   th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
   th { color: #999; font-weight: 500; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  a { color: #4da3ff; }
 </style>
 </head>
 <body>
@@ -60,6 +91,15 @@ function renderDashboard(summary: AdminSummary, daily: DailyStat[]): string {
     </thead>
     <tbody>
       ${rows}
+    </tbody>
+  </table>
+  <h2>Foydalanuvchilar</h2>
+  <table>
+    <thead>
+      <tr><th>Ism / Telegram</th><th>Reyting</th><th>O'yinlar</th><th>G'alabalar</th></tr>
+    </thead>
+    <tbody>
+      ${userRows}
     </tbody>
   </table>
 </body>

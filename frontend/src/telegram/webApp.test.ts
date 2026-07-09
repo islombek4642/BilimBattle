@@ -7,6 +7,7 @@ import {
   readyWebApp,
   buildInviteLink,
   shareInviteLink,
+  openTelegramProfile,
   hapticImpact,
   hapticNotification,
 } from './webApp';
@@ -73,6 +74,24 @@ describe('telegram/webApp', () => {
     shareInviteLink('https://t.me/bilimbattle_bot?startapp=invite_1', "Men bilan o'ynang!");
 
     expect(openSpy).toHaveBeenCalledOnce();
+    openSpy.mockRestore();
+  });
+
+  it('opens a user profile via openTelegramLink when the WebApp is present', () => {
+    const openTelegramLink = vi.fn();
+    window.Telegram = { WebApp: { openTelegramLink } } as any;
+
+    openTelegramProfile('some_handle');
+
+    expect(openTelegramLink).toHaveBeenCalledWith('https://t.me/some_handle');
+  });
+
+  it('falls back to window.open for a profile link when no Telegram WebApp is present', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    openTelegramProfile('some_handle');
+
+    expect(openSpy).toHaveBeenCalledWith('https://t.me/some_handle', '_blank');
     openSpy.mockRestore();
   });
 

@@ -41,5 +41,7 @@ describe('GET /api/admin/stats', () => {
     expect(res.body.summary).toHaveProperty('returningUsers');
     expect(Array.isArray(res.body.daily)).toBe(true);
     expect(res.body.daily.length).toBe(14);
+    expect(Array.isArray(res.body.users)).toBe(true);
+    expect(res.body.users.some((u: { telegramId: number }) => u.telegramId === 9999)).toBe(true);
   });
 });

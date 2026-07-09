@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { requireAuth, AuthenticatedRequest } from '../auth/authMiddleware';
 import { env } from '../config/env';
-import { getAdminSummary, getDailyStats } from './statsQueries';
+import { getAdminSummary, getDailyStats, getUserList } from './statsQueries';
 
 export const adminApiRouter = Router();
 
@@ -15,6 +15,6 @@ adminApiRouter.get('/admin/stats', requireAuth, async (req: AuthenticatedRequest
     return;
   }
 
-  const [summary, daily] = await Promise.all([getAdminSummary(), getDailyStats(14)]);
-  res.json({ summary, daily });
+  const [summary, daily, users] = await Promise.all([getAdminSummary(), getDailyStats(14), getUserList()]);
+  res.json({ summary, daily, users });
 });
