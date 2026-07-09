@@ -80,6 +80,6 @@ describe('WaitingScreen + real useGameSocket integration', () => {
       vi.advanceTimersByTime(2000);
     });
 
-    expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1' });
+    expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1', category: 'umumiy_bilim' });
   });
 });

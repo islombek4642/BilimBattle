@@ -13,9 +13,13 @@ const MAX_SWING_POINTS = 500;
 export function BattleHeader({
   scores,
   opponent,
+  questionIndex,
+  totalQuestions,
 }: {
   scores: ScoreEntry[];
   opponent: OpponentInfo | null;
+  questionIndex: number;
+  totalQuestions: number;
 }) {
   const { user } = useAuth();
   const myUserId = user?.id ?? -1;
@@ -37,6 +41,9 @@ export function BattleHeader({
           <BattleAvatar telegramId={opponent?.telegramId ?? null} size={36} borderColorClass="border-ios-red" />
         </div>
       </div>
+      <span className="text-center text-xs font-semibold tabular-nums text-ios-secondary-label">
+        {questionIndex + 1}/{totalQuestions}
+      </span>
       <div className="flex h-2 w-full overflow-hidden rounded-full">
         <div data-testid="tugofwar-blue" className="h-full bg-ios-blue transition-all duration-300" style={{ width: `${position}%` }} />
         <div data-testid="tugofwar-red" className="h-full bg-ios-red transition-all duration-300" style={{ width: `${100 - position}%` }} />

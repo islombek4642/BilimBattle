@@ -74,11 +74,26 @@ export function WaitingScreen({
   useEffect(() => {
     if (!showVs || !matchFound) return;
     const timer = setTimeout(() => {
-      replace({ name: 'battle', gameId: matchFound.gameId });
+      replace({ name: 'battle', gameId: matchFound.gameId, category: matchFound.category });
       clearMatchFound();
     }, VS_REVEAL_MS);
     return () => clearTimeout(timer);
   }, [showVs, matchFound, replace, clearMatchFound]);
+
+  // Elapsed time while actively searching, so the wait doesn't feel
+  // indefinite/frozen. Resets to 0 (via the `!showVs` guard tearing the
+  // interval down and a fresh one starting) if this screen is reused for a
+  // new search after cancelling.
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  useEffect(() => {
+    if (showVs) return;
+    setElapsedSeconds(0);
+    const start = Date.now();
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showVs]);
 
   const handleCancel = () => {
     if (intent === 'quick') {
@@ -122,6 +137,9 @@ export function WaitingScreen({
         {intent === 'joining'
           ? "Do'stingiz o'yiniga ulanmoqda..."
           : `${categoryLabel(category)} bo'yicha raqib qidirilmoqda...`}
+      </p>
+      <p className="text-sm tabular-nums text-ios-secondary-label" data-testid="waiting-elapsed">
+        {elapsedSeconds}s
       </p>
       {!connected && (
         <p className="text-sm text-ios-red">Aloqa uzildi. Qayta ulanmoqda...</p>

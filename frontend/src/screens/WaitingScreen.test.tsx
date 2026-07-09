@@ -1,6 +1,6 @@
 // frontend/src/screens/WaitingScreen.test.tsx
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { WaitingScreen } from './WaitingScreen';
 import * as authContext from '../context/AuthContext';
 import * as navigationContext from '../context/NavigationContext';
@@ -99,8 +99,21 @@ describe('WaitingScreen', () => {
 
     vi.advanceTimersByTime(2000);
 
-    expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1' });
+    expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1', category: 'umumiy_bilim' });
     expect(clearMatchFound).toHaveBeenCalledOnce();
+  });
+
+  it('counts up the elapsed search time once per second while searching', () => {
+    mockSocket();
+    render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
+
+    expect(screen.getByTestId('waiting-elapsed')).toHaveTextContent('0s');
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(screen.getByTestId('waiting-elapsed')).toHaveTextContent('3s');
   });
 
   it('calls leaveQueue and goes back when cancelling a quick match', () => {

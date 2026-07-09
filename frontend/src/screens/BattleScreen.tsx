@@ -7,7 +7,7 @@ import { CountdownTimer } from '../components/CountdownTimer';
 import { ScoreEntry } from '../api/types';
 import { playSelectFeedback, playCorrectFeedback, playIncorrectFeedback } from '../utils/feedback';
 
-export function BattleScreen({ gameId }: { gameId: string }) {
+export function BattleScreen({ gameId, category }: { gameId: string; category: string }) {
   const {
     question,
     questionResult,
@@ -44,11 +44,12 @@ export function BattleScreen({ gameId }: { gameId: string }) {
         scores: gameOver.scores,
         winnerId: gameOver.winnerId,
         forfeited: gameOver.forfeited ?? false,
+        category,
       });
       clearGameOver();
       clearQuestionResult();
     }
-  }, [gameOver, replace, clearGameOver, clearQuestionResult]);
+  }, [gameOver, replace, clearGameOver, clearQuestionResult, category]);
 
   useEffect(() => {
     if (connected) {
@@ -126,7 +127,12 @@ export function BattleScreen({ gameId }: { gameId: string }) {
   return (
     <div className="flex min-h-full flex-col gap-5 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
       <div className="flex flex-col gap-3">
-        <BattleHeader scores={questionResult?.scores ?? restoredScores} opponent={opponent} />
+        <BattleHeader
+          scores={questionResult?.scores ?? restoredScores}
+          opponent={opponent}
+          questionIndex={question.index}
+          totalQuestions={question.total}
+        />
         <div className="flex justify-end">
           <CountdownTimer key={question.index} timeLimitMs={question.timeLimitMs} />
         </div>

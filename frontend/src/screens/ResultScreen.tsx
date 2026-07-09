@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
+import { useGameSocketContext } from '../context/GameSocketContext';
 import { shareInviteLink } from '../telegram/webApp';
 import { findMyScore } from '../utils/score';
 import { playResultFeedback } from '../utils/feedback';
@@ -13,13 +14,16 @@ export function ResultScreen({
   scores,
   winnerId,
   forfeited,
+  category,
 }: {
   scores: ScoreEntry[];
   winnerId: number | null;
   forfeited: boolean;
+  category: string;
 }) {
   const { user } = useAuth();
   const { reset } = useNavigation();
+  const { joinQueue } = useGameSocketContext();
   const isWinner = winnerId === user?.id;
   const isDraw = winnerId === null;
 
@@ -42,6 +46,11 @@ export function ResultScreen({
     shareInviteLink(`https://t.me/${botUsername}`, `BilimBattle'da ${myScore} ball to'pladim!`);
   };
 
+  const handlePlayAgain = () => {
+    joinQueue(category);
+    reset({ name: 'waiting', category, intent: 'quick' });
+  };
+
   const resultColor = isDraw ? 'text-ios-secondary-label' : isWinner ? 'text-ios-green' : 'text-ios-red';
 
   return (
@@ -57,8 +66,15 @@ export function ResultScreen({
         </div>
       </div>
       <div className="flex flex-col gap-3">
-        <PrimaryButton onClick={() => reset({ name: 'home' })}>Yana o'ynash</PrimaryButton>
+        <PrimaryButton onClick={handlePlayAgain}>Yana o'ynash</PrimaryButton>
         <SecondaryButton onClick={handleShare}>Do'stga ulashish</SecondaryButton>
+        <button
+          type="button"
+          onClick={() => reset({ name: 'home' })}
+          className="py-2 text-sm font-medium text-ios-secondary-label"
+        >
+          Bosh sahifa
+        </button>
       </div>
     </div>
   );

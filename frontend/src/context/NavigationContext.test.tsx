@@ -97,7 +97,7 @@ describe('NavigationContext', () => {
       return (
         <div>
           <div>current: {current.name}</div>
-          <button onClick={() => navigate({ name: 'battle', gameId: 'g1' })}>
+          <button onClick={() => navigate({ name: 'battle', gameId: 'g1', category: 'umumiy_bilim' })}>
             go-battle
           </button>
         </div>

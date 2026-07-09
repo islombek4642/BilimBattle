@@ -17,6 +17,8 @@ describe('BattleHeader', () => {
       <BattleHeader
         scores={[{ userId: 1, score: 0 }, { userId: 2, score: 0 }]}
         opponent={{ telegramId: 222, firstName: 'Vali' }}
+        questionIndex={0}
+        totalQuestions={7}
       />
     );
 
@@ -25,8 +27,22 @@ describe('BattleHeader', () => {
   });
 
   it('shows a fallback label when opponent is not yet known', () => {
-    render(<BattleHeader scores={[]} opponent={null} />);
+    render(<BattleHeader scores={[]} opponent={null} questionIndex={0} totalQuestions={7} />);
     expect(screen.getByText('Raqib')).toBeInTheDocument();
+  });
+
+  it('shows the 1-based question number out of the total', () => {
+    render(
+      <BattleHeader
+        scores={[]}
+        opponent={{ telegramId: 222, firstName: 'Vali' }}
+        questionIndex={4}
+        totalQuestions={7}
+      />
+    );
+
+    // questionIndex is 0-based (4 = the 5th question) - displayed as "5/7".
+    expect(screen.getByText('5/7')).toBeInTheDocument();
   });
 
   it('splits the bar 50/50 when scores are tied', () => {
@@ -34,6 +50,8 @@ describe('BattleHeader', () => {
       <BattleHeader
         scores={[{ userId: 1, score: 300 }, { userId: 2, score: 300 }]}
         opponent={{ telegramId: 222, firstName: 'Vali' }}
+        questionIndex={0}
+        totalQuestions={7}
       />
     );
 
@@ -46,6 +64,8 @@ describe('BattleHeader', () => {
       <BattleHeader
         scores={[{ userId: 1, score: 500 }, { userId: 2, score: 250 }]}
         opponent={{ telegramId: 222, firstName: 'Vali' }}
+        questionIndex={0}
+        totalQuestions={7}
       />
     );
 
@@ -59,6 +79,8 @@ describe('BattleHeader', () => {
       <BattleHeader
         scores={[{ userId: 1, score: 2000 }, { userId: 2, score: 0 }]}
         opponent={{ telegramId: 222, firstName: 'Vali' }}
+        questionIndex={0}
+        totalQuestions={7}
       />
     );
 
@@ -71,6 +93,8 @@ describe('BattleHeader', () => {
       <BattleHeader
         scores={[{ userId: 1, score: 0 }, { userId: 2, score: 2000 }]}
         opponent={{ telegramId: 222, firstName: 'Vali' }}
+        questionIndex={0}
+        totalQuestions={7}
       />
     );
 

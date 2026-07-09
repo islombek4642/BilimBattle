@@ -26,10 +26,15 @@ function Router() {
     case 'waiting':
       return <WaitingScreen category={current.category} intent={current.intent} />;
     case 'battle':
-      return <BattleScreen gameId={current.gameId} />;
+      return <BattleScreen gameId={current.gameId} category={current.category} />;
     case 'result':
       return (
-        <ResultScreen scores={current.scores} winnerId={current.winnerId} forfeited={current.forfeited} />
+        <ResultScreen
+          scores={current.scores}
+          winnerId={current.winnerId}
+          forfeited={current.forfeited}
+          category={current.category}
+        />
       );
     case 'leaderboard':
       return <LeaderboardScreen />;
