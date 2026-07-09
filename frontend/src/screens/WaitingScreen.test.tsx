@@ -1,11 +1,12 @@
 // frontend/src/screens/WaitingScreen.test.tsx
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { WaitingScreen } from './WaitingScreen';
 import * as authContext from '../context/AuthContext';
 import * as navigationContext from '../context/NavigationContext';
 import * as gameSocketContext from '../context/GameSocketContext';
 import * as telegram from '../telegram/webApp';
+import type { OpponentInfo } from '../socket/useGameSocket';
 
 describe('WaitingScreen', () => {
   const navigate = vi.fn();
@@ -26,6 +27,7 @@ describe('WaitingScreen', () => {
   function buildDefaultSocket() {
     return {
       matchFound: null,
+      opponent: null as OpponentInfo | null,
       clearMatchFound,
       leaveQueue,
       inviteCreated: false,
@@ -47,12 +49,18 @@ describe('WaitingScreen', () => {
     clearInviteExpired.mockClear();
 
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
-      token: 'tok', user: { id: 1, telegramId: 555 } as any, loading: false, error: null,
+      token: 'tok', user: { id: 1, telegramId: 555, firstName: 'Aziz' } as any, loading: false, error: null,
     });
     vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({
       current: { name: 'waiting', category: 'umumiy_bilim', intent: 'quick' },
       navigate, goBack, replace, reset: vi.fn(),
     });
+
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('shows a searching message with the category label', () => {
@@ -61,13 +69,21 @@ describe('WaitingScreen', () => {
     expect(screen.getByText(/Umumiy bilim/)).toBeInTheDocument();
   });
 
-  it('replaces the current screen with battle when matchFound arrives', async () => {
-    mockSocket({ matchFound: { gameId: 'g1', category: 'umumiy_bilim' } as any });
+  it('shows a "VS" reveal with both names when matchFound arrives, then replaces with battle after the reveal delay', () => {
+    mockSocket({
+      matchFound: { gameId: 'g1', category: 'umumiy_bilim', opponent: { telegramId: 999, firstName: 'Vali' } } as any,
+      opponent: { telegramId: 999, firstName: 'Vali' },
+    });
     render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
 
-    await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1' })
-    );
+    expect(screen.getByText('VS')).toBeInTheDocument();
+    expect(screen.getByText('Aziz')).toBeInTheDocument();
+    expect(screen.getByText('Vali')).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(2000);
+
+    expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1' });
     expect(clearMatchFound).toHaveBeenCalledOnce();
   });
 

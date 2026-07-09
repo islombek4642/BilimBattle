@@ -1,5 +1,5 @@
 // frontend/src/screens/WaitingScreen.tsx
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useGameSocketContext } from '../context/GameSocketContext';
@@ -7,6 +7,9 @@ import { categoryLabel } from '../utils/category';
 import { buildInviteLink, shareInviteLink } from '../telegram/webApp';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
+import { BattleAvatar } from '../components/BattleAvatar';
+
+const VS_REVEAL_MS = 1800;
 
 export function WaitingScreen({
   category,
@@ -19,6 +22,7 @@ export function WaitingScreen({
   const { replace, goBack } = useNavigation();
   const {
     matchFound,
+    opponent,
     clearMatchFound,
     leaveQueue,
     inviteCreated,
@@ -27,26 +31,37 @@ export function WaitingScreen({
     clearInviteExpired,
     connected,
   } = useGameSocketContext();
+  const [showVs, setShowVs] = useState(false);
 
   useEffect(() => {
     if (matchFound) {
-      replace({ name: 'battle', gameId: matchFound.gameId });
-      clearMatchFound();
+      setShowVs(true);
     }
     // `GameSocketProvider` sits above `NavigationProvider`, so `matchFound`/
     // `inviteCreated`/`inviteExpired` persist across mount/unmount as the
     // user navigates between screens. Without this cleanup, a match that
     // lands right as the user cancels (leave_queue is fire-and-forget, no
     // ack) would sit in state and get picked up as stale data the next time
-    // this screen mounts for an unrelated queue/invite.
-    // clearMatchFound/clearInviteCreated/clearInviteExpired are idempotent,
-    // so this is safe to run unconditionally on unmount.
+    // this screen mounts for an unrelated queue/invite. `opponent` is
+    // deliberately NOT cleared here - it needs to survive into BattleScreen
+    // (see BattleScreen's own unmount cleanup for where it's cleared).
+    // clearMatchFound/clearInviteCreated/clearInviteExpired are all
+    // idempotent, so this is safe to run unconditionally on unmount.
     return () => {
       clearMatchFound();
       clearInviteCreated();
       clearInviteExpired();
     };
-  }, [matchFound, replace, clearMatchFound, clearInviteCreated, clearInviteExpired]);
+  }, [matchFound, clearMatchFound, clearInviteCreated, clearInviteExpired]);
+
+  useEffect(() => {
+    if (!showVs || !matchFound) return;
+    const timer = setTimeout(() => {
+      replace({ name: 'battle', gameId: matchFound.gameId });
+      clearMatchFound();
+    }, VS_REVEAL_MS);
+    return () => clearTimeout(timer);
+  }, [showVs, matchFound, replace, clearMatchFound]);
 
   const handleCancel = () => {
     if (intent === 'quick') {
@@ -61,6 +76,24 @@ export function WaitingScreen({
     const link = buildInviteLink(botUsername, user.telegramId);
     shareInviteLink(link, "BilimBattle'da men bilan o'ynang!");
   };
+
+  if (showVs) {
+    return (
+      <div className="flex min-h-full flex-col items-center justify-center gap-8 p-6 text-center">
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col items-center gap-2">
+            <BattleAvatar telegramId={user?.telegramId ?? null} size={72} borderColorClass="border-ios-blue" />
+            <span className="font-semibold text-ios-blue">{user?.firstName ?? 'Siz'}</span>
+          </div>
+          <span className="text-3xl font-black text-ios-label">VS</span>
+          <div className="flex flex-col items-center gap-2">
+            <BattleAvatar telegramId={opponent?.telegramId ?? null} size={72} borderColorClass="border-ios-red" />
+            <span className="font-semibold text-ios-red">{opponent?.firstName ?? 'Raqib'}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center gap-5 p-6 text-center">
