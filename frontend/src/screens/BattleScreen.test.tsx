@@ -13,6 +13,7 @@ describe('BattleScreen', () => {
   const clearGameOver = vi.fn();
   const clearQuestionResult = vi.fn();
   const clearQuestion = vi.fn();
+  const clearOpponent = vi.fn();
   const reconnectGame = vi.fn().mockResolvedValue({ found: true });
 
   function mockSocket(overrides: Record<string, unknown> = {}) {
@@ -21,10 +22,12 @@ describe('BattleScreen', () => {
       questionResult: null,
       gameOver: null,
       connected: true,
+      opponent: null,
       submitAnswer,
       clearGameOver,
       clearQuestionResult,
       clearQuestion,
+      clearOpponent,
       reconnectGame,
       ...overrides,
     } as any);
@@ -37,6 +40,7 @@ describe('BattleScreen', () => {
     clearGameOver.mockClear();
     clearQuestionResult.mockClear();
     clearQuestion.mockClear();
+    clearOpponent.mockClear();
     reconnectGame.mockClear().mockResolvedValue({ found: true });
 
     vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({
@@ -168,5 +172,26 @@ describe('BattleScreen', () => {
 
     expect(feedback.playIncorrectFeedback).toHaveBeenCalledOnce();
     expect(feedback.playCorrectFeedback).not.toHaveBeenCalled();
+  });
+
+  it('renders the opponent name from context inside the header', () => {
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
+      opponent: { telegramId: 222, firstName: 'Vali' },
+    });
+    render(<BattleScreen gameId="g1" />);
+
+    expect(screen.getByText('Vali')).toBeInTheDocument();
+  });
+
+  it('clears opponent on unmount', () => {
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
+    });
+    const { unmount } = render(<BattleScreen gameId="g1" />);
+
+    unmount();
+
+    expect(clearOpponent).toHaveBeenCalledOnce();
   });
 });

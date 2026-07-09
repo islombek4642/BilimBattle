@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext';
 import { useGameSocketContext } from '../context/GameSocketContext';
-import { ScoreBar } from '../components/ScoreBar';
+import { BattleHeader } from '../components/BattleHeader';
 import { CountdownTimer } from '../components/CountdownTimer';
 import { ScoreEntry } from '../api/types';
 import { playSelectFeedback, playCorrectFeedback, playIncorrectFeedback } from '../utils/feedback';
@@ -13,10 +13,12 @@ export function BattleScreen({ gameId }: { gameId: string }) {
     questionResult,
     gameOver,
     connected,
+    opponent,
     submitAnswer,
     clearGameOver,
     clearQuestionResult,
     clearQuestion,
+    clearOpponent,
     reconnectGame,
   } = useGameSocketContext();
   const { replace } = useNavigation();
@@ -71,8 +73,9 @@ export function BattleScreen({ gameId }: { gameId: string }) {
       clearQuestion();
       clearQuestionResult();
       clearGameOver();
+      clearOpponent();
     };
-  }, [clearQuestion, clearQuestionResult, clearGameOver]);
+  }, [clearQuestion, clearQuestionResult, clearGameOver, clearOpponent]);
 
   // Fires exactly once per question: questionResult is reset to null every
   // time a new `question` event arrives, so this effect's dependency array
@@ -104,9 +107,11 @@ export function BattleScreen({ gameId }: { gameId: string }) {
 
   return (
     <div className="flex min-h-full flex-col gap-5 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
-      <div className="flex items-center justify-between gap-4">
-        <ScoreBar scores={questionResult?.scores ?? restoredScores} />
-        <CountdownTimer key={question.index} timeLimitMs={question.timeLimitMs} />
+      <div className="flex flex-col gap-3">
+        <BattleHeader scores={questionResult?.scores ?? restoredScores} opponent={opponent} />
+        <div className="flex justify-end">
+          <CountdownTimer key={question.index} timeLimitMs={question.timeLimitMs} />
+        </div>
       </div>
       <p className="text-xl font-bold leading-snug text-ios-label">{question.text}</p>
       <div className="flex flex-col gap-3">
