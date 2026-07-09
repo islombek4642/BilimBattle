@@ -42,7 +42,17 @@ export function getInitData(): string {
 }
 
 export function getStartParam(): string | undefined {
-  return getTelegramWebApp()?.initDataUnsafe?.start_param;
+  const fromWebApp = getTelegramWebApp()?.initDataUnsafe?.start_param;
+  if (fromWebApp) return fromWebApp;
+
+  // Telegram only populates initDataUnsafe.start_param when the Mini App is
+  // launched via a direct-link (t.me/<bot>?startapp=...) with the bot's Menu
+  // Button configured as that same Web App. When the bot instead falls back
+  // to a chat message with an inline "Open" button (see backend's
+  // telegramBot.ts), the deep-link payload arrives as a plain query param on
+  // the Web App's own URL instead - so it's read here as a fallback.
+  const fromQuery = new URLSearchParams(window.location.search).get('startapp');
+  return fromQuery ?? undefined;
 }
 
 export function readyWebApp(): void {

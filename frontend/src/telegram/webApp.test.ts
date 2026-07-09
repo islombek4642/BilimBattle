@@ -35,6 +35,35 @@ describe('telegram/webApp', () => {
     expect(getStartParam()).toBe('invite_555');
   });
 
+  it('falls back to a "startapp" URL query param when initDataUnsafe has no start_param', () => {
+    // Regression: a friend opening an invite via the bot's chat-based
+    // fallback message (no Menu Button Web App configured in BotFather)
+    // never gets initDataUnsafe.start_param populated by Telegram at all -
+    // the payload only arrives as a query string on the Web App's own URL
+    // (see backend's telegramBot.ts, which forwards it that way).
+    window.Telegram = {
+      WebApp: { initData: '', initDataUnsafe: {} },
+    } as any;
+    const originalLocation = window.location.href;
+    window.history.pushState({}, '', '/?startapp=invite_777');
+
+    expect(getStartParam()).toBe('invite_777');
+
+    window.history.pushState({}, '', originalLocation);
+  });
+
+  it('prefers initDataUnsafe.start_param over the URL query fallback when both are present', () => {
+    window.Telegram = {
+      WebApp: { initData: '', initDataUnsafe: { start_param: 'invite_555' } },
+    } as any;
+    const originalLocation = window.location.href;
+    window.history.pushState({}, '', '/?startapp=invite_777');
+
+    expect(getStartParam()).toBe('invite_555');
+
+    window.history.pushState({}, '', originalLocation);
+  });
+
   it('calls ready() and expand() on the WebApp when readyWebApp() is invoked', () => {
     const ready = vi.fn();
     const expand = vi.fn();
