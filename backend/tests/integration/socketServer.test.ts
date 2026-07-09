@@ -247,4 +247,43 @@ describe('socket server session handling', () => {
       await pool.query(`DELETE FROM users WHERE telegram_id = 8901`);
     }
   });
+
+  it('includes opponent info in the reconnect_game ack for a human-vs-human match, with no bot override', async () => {
+    const category = 'umumiy_bilim';
+    const gameId = 'reconnect-human-opponent-test-game';
+    const human = await upsertUser(8902, 'reconB', 'ReconB', null);
+    const opponentHuman = await upsertUser(8903, 'reconC', 'ReconC', null);
+
+    const fakeGame: GameState = {
+      gameId,
+      category,
+      questions: [{ id: 1, text: 'q', options: ['a', 'b'], correctIndex: 0 }],
+      currentQuestionIndex: 0,
+      players: [
+        { userId: human.id, socketId: 'placeholder', score: 0, answers: [], isBot: false },
+        { userId: opponentHuman.id, socketId: 'placeholder-2', score: 0, answers: [], isBot: false },
+      ],
+      status: 'active',
+    };
+    await saveGame(fakeGame);
+
+    const token = signSession({ userId: human.id, telegramId: 8902 });
+    const client: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token } });
+
+    try {
+      const ack = await new Promise<any>((resolve, reject) => {
+        client.on('connect_error', reject);
+        client.on('connect', () => {
+          client.emit('reconnect_game', { gameId }, (state: any) => resolve(state));
+        });
+      });
+
+      expect(ack.found).toBe(true);
+      expect(ack.opponent).toEqual({ telegramId: 8903, firstName: 'ReconC' });
+    } finally {
+      client.close();
+      await deleteGame(gameId);
+      await pool.query(`DELETE FROM users WHERE telegram_id IN (8902, 8903)`);
+    }
+  });
 });

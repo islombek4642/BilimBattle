@@ -211,6 +211,8 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
                 telegramId: opponentUser.telegramId,
                 firstName: opponentPlayer.isBot ? (game.botDisplayName ?? opponentUser.firstName) : opponentUser.firstName,
               };
+            } else {
+              console.error(`socketServer: missing user record for opponent userId=${opponentPlayer.userId} - omitting opponent from reconnect_game ack (gameId=${gameId})`);
             }
           }
 
