@@ -41,10 +41,17 @@ describe('BottomNav', () => {
 
     const homeTab = screen.getByRole('button', { name: 'Bosh sahifa' });
     expect(homeTab).toHaveAttribute('aria-current', 'page');
-    expect(homeTab).toHaveClass('text-ios-blue');
+    // The colored "chip" highlight lives on an inner span (sized to its own
+    // content), not the outer flex-1 button (which stays full-width for a
+    // large touch target) - see BottomNav.tsx's comment for why.
+    const homeChip = homeTab.querySelector('span')!;
+    expect(homeChip).toHaveClass('text-ios-blue');
+    expect(homeChip).toHaveClass('bg-ios-blue/10');
 
     const leaderboardTab = screen.getByRole('button', { name: 'Reyting' });
     expect(leaderboardTab).not.toHaveAttribute('aria-current');
-    expect(leaderboardTab).toHaveClass('text-ios-secondary-label');
+    const leaderboardChip = leaderboardTab.querySelector('span')!;
+    expect(leaderboardChip).toHaveClass('text-ios-secondary-label');
+    expect(leaderboardChip).not.toHaveClass('bg-ios-blue/10');
   });
 });
