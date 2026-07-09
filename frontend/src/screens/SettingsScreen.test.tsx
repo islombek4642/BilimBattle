@@ -14,7 +14,10 @@ describe('SettingsScreen', () => {
     localStorage.clear();
     navigate.mockClear();
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
-      token: 'tok', user: { id: 1, telegramId: 111 } as any, loading: false, error: null,
+      token: 'tok',
+      user: { id: 1, telegramId: 111, firstName: 'Aziz', username: 'aziz_handle' } as any,
+      loading: false,
+      error: null,
     });
     vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({
       current: { name: 'settings' },
@@ -26,23 +29,34 @@ describe('SettingsScreen', () => {
     localStorage.clear();
   });
 
-  it('loads and displays stats', async () => {
+  it('shows the profile card with name, username, and headline stats', async () => {
     vi.spyOn(statsApi, 'getMyStats').mockResolvedValue({
       gamesPlayed: 10, gamesWon: 6, winRate: 60, currentStreak: 2, bestStreak: 4, rating: 1080,
     });
 
     render(<SettingsScreen />);
 
-    await waitFor(() => expect(screen.getByText("O'ynagan o'yinlar")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Aziz')).toBeInTheDocument());
+    expect(screen.getByText('@aziz_handle')).toBeInTheDocument();
+    expect(screen.getByText('O\'yinlar')).toBeInTheDocument();
     expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.getByText("G'alaba foizi")).toBeInTheDocument();
+    expect(screen.getByText('Reyting')).toBeInTheDocument();
+    expect(screen.getByText('1080')).toBeInTheDocument();
+  });
+
+  it('loads and displays the detailed stat rows', async () => {
+    vi.spyOn(statsApi, 'getMyStats').mockResolvedValue({
+      gamesPlayed: 10, gamesWon: 6, winRate: 60, currentStreak: 2, bestStreak: 4, rating: 1080,
+    });
+
+    render(<SettingsScreen />);
+
+    await waitFor(() => expect(screen.getByText("G'alaba foizi")).toBeInTheDocument());
     expect(screen.getByText('60%')).toBeInTheDocument();
     expect(screen.getByText('Joriy seriya')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('Eng uzun seriya')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
-    expect(screen.getByText('Reyting')).toBeInTheDocument();
-    expect(screen.getByText('1080')).toBeInTheDocument();
   });
 
   it('defaults sound to enabled and toggles it, persisting to localStorage', async () => {
