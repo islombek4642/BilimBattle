@@ -5,6 +5,7 @@ import { submitAnswer, handleDisconnect, handleReconnect } from '../game/gameEng
 import { handleJoinQueue, cancelWaiting, createMatch } from '../matchmaking/matchmaker';
 import { createInvite, consumeInvite } from '../invite/inviteRoom';
 import { isValidCategory } from '../questions/questionRepository';
+import { getUserById } from '../users/userRepository';
 import { env } from '../config/env';
 
 export interface SocketData {
@@ -189,17 +190,35 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
       // finishes/forfeits in that gap, getGame() would return null and
       // `game!.currentQuestionIndex` below would throw inside this handler.
       handleReconnect(gameId, socket.data.userId, socket.id)
-        .then((game) => {
+        .then(async (game) => {
           if (!game) {
             ack({ found: false });
             return;
           }
           socket.join(gameId);
           socket.data.gameId = gameId;
+
+          // Same "who's the other player" derivation as matchmaker.ts's
+          // createMatch: a bot's presented name comes from the match's own
+          // botDisplayName (picked once at match start), never the DB's
+          // literal "Bot" first_name.
+          const opponentPlayer = game.players.find((p) => p.userId !== socket.data.userId);
+          let opponent: { telegramId: number; firstName: string } | undefined;
+          if (opponentPlayer) {
+            const opponentUser = await getUserById(opponentPlayer.userId);
+            if (opponentUser) {
+              opponent = {
+                telegramId: opponentUser.telegramId,
+                firstName: opponentPlayer.isBot ? (game.botDisplayName ?? opponentUser.firstName) : opponentUser.firstName,
+              };
+            }
+          }
+
           ack({
             found: true,
             currentQuestionIndex: game.currentQuestionIndex,
             scores: game.players.map((p) => ({ userId: p.userId, score: p.score })),
+            opponent,
           });
         })
         .catch((err) => {

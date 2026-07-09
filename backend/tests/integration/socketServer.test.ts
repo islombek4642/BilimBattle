@@ -7,7 +7,7 @@ import * as gameEngine from '../../src/game/gameEngine';
 import * as matchmaker from '../../src/matchmaking/matchmaker';
 import { pool } from '../../src/config/db';
 import { redis, closeRedis } from '../../src/config/redis';
-import { upsertUser } from '../../src/users/userRepository';
+import { upsertUser, getOrCreateBotUser } from '../../src/users/userRepository';
 import { saveGame, deleteGame, GameState } from '../../src/game/gameState';
 import { leaveQueue } from '../../src/matchmaking/queue';
 
@@ -205,6 +205,46 @@ describe('socket server session handling', () => {
       // same category).
       await leaveQueue(category, user.id);
       await pool.query(`DELETE FROM users WHERE telegram_id = 8801`);
+    }
+  });
+
+  it('includes opponent info in the reconnect_game ack, using the bot display name when the other player is a bot', async () => {
+    const category = 'umumiy_bilim';
+    const gameId = 'reconnect-opponent-test-game';
+    const human = await upsertUser(8901, 'reconA', 'ReconA', null);
+    const bot = await getOrCreateBotUser();
+
+    const fakeGame: GameState = {
+      gameId,
+      category,
+      questions: [{ id: 1, text: 'q', options: ['a', 'b'], correctIndex: 0 }],
+      currentQuestionIndex: 0,
+      players: [
+        { userId: human.id, socketId: 'placeholder', score: 0, answers: [], isBot: false },
+        { userId: bot.id, socketId: 'bot', score: 0, answers: [], isBot: true },
+      ],
+      status: 'active',
+      botDisplayName: 'Sardor',
+    };
+    await saveGame(fakeGame);
+
+    const token = signSession({ userId: human.id, telegramId: 8901 });
+    const client: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token } });
+
+    try {
+      const ack = await new Promise<any>((resolve, reject) => {
+        client.on('connect_error', reject);
+        client.on('connect', () => {
+          client.emit('reconnect_game', { gameId }, (state: any) => resolve(state));
+        });
+      });
+
+      expect(ack.found).toBe(true);
+      expect(ack.opponent).toEqual({ telegramId: 0, firstName: 'Sardor' });
+    } finally {
+      client.close();
+      await deleteGame(gameId);
+      await pool.query(`DELETE FROM users WHERE telegram_id = 8901`);
     }
   });
 });
