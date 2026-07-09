@@ -3,7 +3,7 @@ import type { AppServer } from '../socket/socketServer';
 import { joinQueue, leaveQueue, popTwoIfAvailable, QueuedPlayer } from './queue';
 import { startGame } from '../game/gameEngine';
 import { isValidCategory } from '../questions/questionRepository';
-import { getOrCreateBotUser } from '../users/userRepository';
+import { getOrCreateBotUser, getUserById } from '../users/userRepository';
 
 const BOT_MATCH_TIMEOUT_MS = 15_000;
 // Tracks users currently waiting in a queue (joined, not yet paired), keyed
@@ -32,6 +32,22 @@ const waitingTimers = new Map<number, NodeJS.Timeout>();
 // server instances, it must become a Lua script (or Redis-based lock)
 // instead, since an in-memory Map obviously can't serialize across processes.
 const categoryLocks = new Map<string, Promise<unknown>>();
+
+// Presentation-only display names for the bot fallback opponent - picked
+// fresh per match so the same human never sees a literal "Bot" (the DB
+// user's real first_name), and so a user playing many matches doesn't
+// always see the identical fake name either. The underlying bot `users` row
+// (telegram_id 0, first_name "Bot") is never changed - this only affects
+// what gets sent over the wire in match_found/reconnect_game.
+export const BOT_DISPLAY_NAMES = [
+  'Aziz', 'Malika', 'Sardor', 'Dilnoza', 'Jasur', 'Nodira', 'Bekzod',
+  'Zarina', 'Otabek', 'Madina', 'Sherzod', 'Gulnora', 'Farrux', 'Shahnoza',
+  "Ulug'bek",
+];
+
+export function pickRandomBotDisplayName(): string {
+  return BOT_DISPLAY_NAMES[Math.floor(Math.random() * BOT_DISPLAY_NAMES.length)];
+}
 
 function runSerialized<T>(category: string, fn: () => Promise<T>): Promise<T> {
   const previous = categoryLocks.get(category) ?? Promise.resolve();
@@ -146,12 +162,40 @@ export async function createMatch(
   socket1?.join(gameId);
   if (socket1) socket1.data.gameId = gameId;
 
-  if (player2.socketId !== 'bot') {
-    const socket2 = io.sockets.sockets.get(player2.socketId);
-    socket2?.join(gameId);
-    if (socket2) socket2.data.gameId = gameId;
+  const socket2 = player2.socketId !== 'bot' ? io.sockets.sockets.get(player2.socketId) : undefined;
+  if (socket2) {
+    socket2.join(gameId);
+    socket2.data.gameId = gameId;
   }
 
-  io.to(gameId).emit('match_found', { gameId, category });
-  await startGame(gameId, category, player1, { ...player2, isBot: player2IsBot });
+  const botDisplayName = player2IsBot ? pickRandomBotDisplayName() : undefined;
+
+  // Each side needs the OTHER side's identity, so both are fetched up front
+  // and match_found is emitted to each socket individually below (not
+  // broadcast via io.to(gameId).emit, which would send the identical
+  // payload to both - the whole point here is the payloads differ).
+  const [player1User, player2User] = await Promise.all([
+    getUserById(player1.userId),
+    getUserById(player2.userId),
+  ]);
+
+  if (socket1 && player2User) {
+    socket1.emit('match_found', {
+      gameId,
+      category,
+      opponent: {
+        telegramId: player2User.telegramId,
+        firstName: player2IsBot ? (botDisplayName ?? player2User.firstName) : player2User.firstName,
+      },
+    });
+  }
+  if (socket2 && player1User) {
+    socket2.emit('match_found', {
+      gameId,
+      category,
+      opponent: { telegramId: player1User.telegramId, firstName: player1User.firstName },
+    });
+  }
+
+  await startGame(gameId, category, player1, { ...player2, isBot: player2IsBot }, botDisplayName);
 }

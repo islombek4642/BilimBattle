@@ -19,6 +19,9 @@ function createFakeIO() {
               join(room: string) {
                 sockets.get(id)!.joinedRooms.push(room);
               },
+              emit(event: string, payload: unknown) {
+                events.push({ room: id, event, payload });
+              },
             } as any);
           }
           return sockets.get(id);
@@ -72,7 +75,8 @@ describe('matchmaker - genuinely concurrent join_queue', () => {
     ]);
 
     const matchFoundEvents = events.filter((e) => e.event === 'match_found');
-    expect(matchFoundEvents.length).toBe(1);
+    // One per socket now (each gets the OTHER player as opponent), not one room-wide broadcast.
+    expect(matchFoundEvents.length).toBe(2);
 
     const questionEvents = events.filter((e) => e.event === 'question');
     expect(questionEvents.length).toBe(1);
