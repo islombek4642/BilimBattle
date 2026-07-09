@@ -136,7 +136,9 @@ export function WaitingScreen({
       <p className="text-lg font-medium text-ios-label">
         {intent === 'joining'
           ? "Do'stingiz o'yiniga ulanmoqda..."
-          : `${categoryLabel(category)} bo'yicha raqib qidirilmoqda...`}
+          : intent === 'invite'
+            ? `${categoryLabel(category)} bo'yicha taklif havolasi tayyorlanmoqda...`
+            : `${categoryLabel(category)} bo'yicha raqib qidirilmoqda...`}
       </p>
       <p className="text-sm tabular-nums text-ios-secondary-label" data-testid="waiting-elapsed">
         {elapsedSeconds}s

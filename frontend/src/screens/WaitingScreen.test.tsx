@@ -67,6 +67,19 @@ describe('WaitingScreen', () => {
     mockSocket();
     render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
     expect(screen.getByText(/Umumiy bilim/)).toBeInTheDocument();
+    expect(screen.getByText(/raqib qidirilmoqda/)).toBeInTheDocument();
+  });
+
+  it('shows an invite-specific message (not "searching for opponent") for intent=invite', () => {
+    // Regression: intent=invite previously fell through to the same
+    // "raqib qidirilmoqda" (searching for opponent) copy as intent=quick,
+    // even though createInvite() (not joinQueue()) is what actually ran -
+    // misleading, since no public matchmaking search is happening here.
+    mockSocket();
+    render(<WaitingScreen category="umumiy_bilim" intent="invite" />);
+    expect(screen.queryByText(/raqib qidirilmoqda/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Umumiy bilim/)).toBeInTheDocument();
+    expect(screen.getByText(/taklif havolasi tayyorlanmoqda/)).toBeInTheDocument();
   });
 
   it('shows a "VS" reveal with both names when matchFound arrives, then replaces with battle after the reveal delay', () => {
