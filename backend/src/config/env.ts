@@ -33,4 +33,10 @@ export const env = {
   // (/api/admin/stats) to that one Telegram account. Optional: unset means
   // nobody can access it (never matches a real telegramId).
   adminTelegramId: process.env.ADMIN_TELEGRAM_ID ? Number(process.env.ADMIN_TELEGRAM_ID) : undefined,
+  // How long question_result stays visible (showing the correct answer in
+  // green/red) before the next question is sent. Defaults to 0 (no delay)
+  // so local dev and the test suite - which play through full matches in a
+  // tight loop - stay fast; production sets this to a real value (e.g. 2000)
+  // via docker-compose so players can actually see the reveal.
+  resultRevealMs: parseInt(process.env.RESULT_REVEAL_MS ?? '0', 10),
 };

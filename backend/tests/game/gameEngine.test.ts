@@ -4,7 +4,20 @@ import { setIOForTesting } from '../../src/socket/socketServer';
 import { startGame, submitAnswer } from '../../src/game/gameEngine';
 import { getGame } from '../../src/game/gameState';
 import { upsertUser } from '../../src/users/userRepository';
+import { env } from '../../src/config/env';
 import { randomUUID } from 'crypto';
+
+// See gameEngineDisconnect.test.ts's identical helper for why this specific
+// combination (fake setTimeout/setInterval, real nextTick/setImmediate/
+// hrtime/Date, plus polling instead of a fixed number of microtask flushes)
+// is required to test a real setTimeout-based delay that itself awaits real
+// Redis/Postgres I/O.
+async function waitUntil(predicate: () => boolean, timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate() && Date.now() < deadline) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+}
 
 function createFakeIO() {
   const events: { room: string; event: string; payload: unknown }[] = [];
@@ -105,6 +118,47 @@ describe('gameEngine full match flow', () => {
     expect(events.find((e) => e.event === 'game_over')).toBeDefined();
     expect(sockets.get('sockA')!.data.gameId).toBeUndefined();
     expect(sockets.get('sockB')!.data.gameId).toBeUndefined();
+  });
+
+  it('waits env.resultRevealMs after question_result before sending the next question', async () => {
+    const originalDelay = env.resultRevealMs;
+    (env as { resultRevealMs: number }).resultRevealMs = 2000;
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'hrtime', 'Date'] });
+
+    try {
+      const { fakeIO, events } = createFakeIO();
+      setIOForTesting(fakeIO as any);
+
+      const gameId = randomUUID();
+      await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' });
+
+      await submitAnswer(gameId, player1Id, 0);
+      // Do NOT await this directly: submitAnswer awaits resolveQuestion,
+      // which now awaits a real (fake-timer-controlled) setTimeout - with
+      // useFakeTimers active, that setTimeout never fires until
+      // advanceTimersByTime is called below, so awaiting it here would hang
+      // the test forever.
+      const secondAnswer = submitAnswer(gameId, player2Id, 1);
+
+      // Let resolveQuestion's synchronous-up-to-the-delay code run (the
+      // question_result emit happens BEFORE the delay) and let real
+      // Redis/Postgres I/O leading up to that point settle.
+      await waitUntil(() => events.some((e) => e.event === 'question_result'));
+
+      // The reveal is showing, but the next question must NOT have been
+      // sent yet - this is the actual behavior being tested.
+      expect(events.filter((e) => e.event === 'question').length).toBe(1);
+
+      jest.advanceTimersByTime(2000);
+      await waitUntil(() => events.filter((e) => e.event === 'question').length >= 2);
+
+      expect(events.filter((e) => e.event === 'question').length).toBe(2);
+
+      await secondAnswer;
+    } finally {
+      jest.useRealTimers();
+      (env as { resultRevealMs: number }).resultRevealMs = originalDelay;
+    }
   });
 
   it('ignores a second answer submission for the same question', async () => {

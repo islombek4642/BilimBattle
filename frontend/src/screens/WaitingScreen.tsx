@@ -96,8 +96,8 @@ export function WaitingScreen({
 
   if (showVs) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center gap-8 p-6 text-center">
-        <div className="flex items-center gap-6">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-gradient-to-br from-ios-blue/10 via-ios-bg to-ios-red/10 p-6 text-center">
+        <div className="flex animate-vs-reveal items-center gap-6">
           <div className="flex flex-col items-center gap-2">
             <BattleAvatar telegramId={user?.telegramId ?? null} size={72} borderColorClass="border-ios-blue" />
             <span className="font-semibold text-ios-blue">{user?.firstName ?? 'Siz'}</span>
@@ -113,7 +113,7 @@ export function WaitingScreen({
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center gap-5 p-6 text-center">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-5 p-6 text-center">
       <div className="relative flex h-20 w-20 items-center justify-center">
         <div className="absolute h-20 w-20 animate-ping rounded-full bg-ios-blue/20" />
         <div className="h-14 w-14 rounded-full bg-ios-blue/10" />

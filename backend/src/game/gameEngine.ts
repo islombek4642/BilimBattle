@@ -3,6 +3,7 @@ import { getGame, saveGame, deleteGame, GameState } from './gameState';
 import { calculateScore, QUESTION_TIME_LIMIT_MS } from './scoring';
 import { getRandomQuestions, QuestionRecord } from '../questions/questionRepository';
 import { recordMatchResult } from '../users/userRepository';
+import { env } from '../config/env';
 
 export interface PlayerInfo {
   userId: number;
@@ -146,6 +147,17 @@ async function resolveQuestion(gameId: string): Promise<void> {
     correctIndex: question.correctIndex,
     scores: game.players.map((p) => ({ userId: p.userId, score: p.score })),
   });
+  // Give clients a moment to actually see the correct-answer reveal before
+  // the next question replaces it - without this, sendNextQuestion below ran
+  // in the very same tick as the emit above, so the green/red highlight was
+  // effectively invisible (reported from live testing: "bosilishi bilan
+  // tezda keyingi savolga o'tib ketyapti"). env.resultRevealMs defaults to 0
+  // (no delay) so local dev and the test suite - which play through full
+  // matches in a tight loop - stay fast; production sets a real value via
+  // docker-compose.
+  if (env.resultRevealMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, env.resultRevealMs));
+  }
   await sendNextQuestion(gameId);
 }
 
