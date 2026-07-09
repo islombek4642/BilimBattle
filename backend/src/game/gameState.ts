@@ -23,6 +23,12 @@ export interface GameState {
   questionStartedAt?: number;
   players: [PlayerState, PlayerState];
   status: 'active' | 'finished';
+  // Only set when one of the two players is the bot fallback (see
+  // matchmaking/matchmaker.ts's BOT_DISPLAY_NAMES) - a random Uzbek first
+  // name picked ONCE at match creation, so the bot looks like the same
+  // "person" for the whole match (including across a reconnect), never the
+  // DB's literal "Bot" name.
+  botDisplayName?: string;
 }
 
 const GAME_TTL_SECONDS = 60 * 30;

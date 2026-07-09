@@ -20,7 +20,13 @@ const QUESTIONS_PER_GAME = 7;
 // disconnect/reconnect handling to this file and may need to revisit this.
 const activeTimers = new Map<string, NodeJS.Timeout>();
 
-export async function startGame(gameId: string, category: string, player1: PlayerInfo, player2: PlayerInfo): Promise<void> {
+export async function startGame(
+  gameId: string,
+  category: string,
+  player1: PlayerInfo,
+  player2: PlayerInfo,
+  botDisplayName?: string
+): Promise<void> {
   const questions = await getRandomQuestions(category, QUESTIONS_PER_GAME);
   const game: GameState = {
     gameId,
@@ -32,6 +38,7 @@ export async function startGame(gameId: string, category: string, player1: Playe
       { userId: player2.userId, socketId: player2.socketId, score: 0, answers: [], isBot: player2.isBot ?? false },
     ],
     status: 'active',
+    botDisplayName,
   };
   await saveGame(game);
   await sendNextQuestion(gameId);
