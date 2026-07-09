@@ -92,4 +92,13 @@ describe('avatarService', () => {
     const cached = await redis.getBuffer(`avatar:${telegramId}`);
     expect(cached).toBeNull();
   });
+
+  it('returns null immediately for the bot telegramId without calling fetch', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+
+    const result = await getAvatarBuffer(0);
+
+    expect(result).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });

@@ -36,6 +36,13 @@ interface TelegramFile {
 }
 
 export async function getAvatarBuffer(telegramId: number): Promise<Buffer | null> {
+  // telegramId <= 0 is not a real Telegram account (e.g. BOT_TELEGRAM_ID = 0,
+  // the sentinel used for bot-fallback matches in userRepository.ts) and can
+  // never have a profile photo - this is a permanent fact, not a value that
+  // could change, so skip Redis and the Telegram API entirely. Nothing to
+  // cache since there's nothing that could ever be looked up.
+  if (telegramId <= 0) return null;
+
   const cached = await redis.getBuffer(avatarCacheKey(telegramId));
   if (cached !== null) {
     return cached.length === 0 ? null : cached;
