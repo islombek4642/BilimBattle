@@ -24,4 +24,23 @@ describe('PrimaryButton', () => {
     render(<PrimaryButton className="mt-4">Test</PrimaryButton>);
     expect(screen.getByRole('button', { name: 'Test' })).toHaveClass('mt-4', 'bg-ios-blue');
   });
+
+  it('adds the shine animation when shiny is set', () => {
+    render(<PrimaryButton shiny>Test</PrimaryButton>);
+    expect(screen.getByRole('button', { name: 'Test' })).toHaveClass('animate-shine');
+  });
+
+  it('does not shine by default', () => {
+    render(<PrimaryButton>Test</PrimaryButton>);
+    expect(screen.getByRole('button', { name: 'Test' })).not.toHaveClass('animate-shine');
+  });
+
+  it('suppresses the shine animation when disabled, even if shiny is set', () => {
+    render(
+      <PrimaryButton shiny disabled>
+        Test
+      </PrimaryButton>
+    );
+    expect(screen.getByRole('button', { name: 'Test' })).not.toHaveClass('animate-shine');
+  });
 });

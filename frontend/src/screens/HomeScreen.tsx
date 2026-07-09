@@ -42,7 +42,7 @@ export function HomeScreen() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <PrimaryButton onClick={() => navigate({ name: 'categorySelect', intent: 'quick' })}>
+        <PrimaryButton shiny onClick={() => navigate({ name: 'categorySelect', intent: 'quick' })}>
           <span className="flex items-center justify-center gap-2">
             <Lightning size={20} weight="fill" />
             Tezkor o'yin
