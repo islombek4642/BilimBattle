@@ -22,6 +22,17 @@ CREATE TABLE IF NOT EXISTS questions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS categories (
+  id SERIAL PRIMARY KEY,
+  key TEXT UNIQUE NOT NULL,
+  label TEXT NOT NULL
+);
+
+INSERT INTO categories (key, label) VALUES
+  ('umumiy_bilim', 'Umumiy bilim'),
+  ('sport_kino_musiqa', 'Sport/Kino/Musiqa')
+ON CONFLICT (key) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS matches (
   id SERIAL PRIMARY KEY,
   category TEXT NOT NULL,

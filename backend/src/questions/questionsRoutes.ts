@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { CATEGORIES } from './questionRepository';
+import { getCategories } from './questionRepository';
 
 export const questionsRouter = Router();
 
-questionsRouter.get('/categories', (_req, res) => {
-  res.json({ categories: CATEGORIES });
+questionsRouter.get('/categories', async (_req, res) => {
+  const categories = await getCategories();
+  res.json({ categories });
 });
