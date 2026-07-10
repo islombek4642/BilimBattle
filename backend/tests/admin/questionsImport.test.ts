@@ -6,6 +6,7 @@ import { pool } from '../../src/config/db';
 import { upsertUser } from '../../src/users/userRepository';
 import { signSession } from '../../src/auth/jwt';
 import { adminApiRouter } from '../../src/admin/adminApiRoutes';
+import * as questionRepository from '../../src/questions/questionRepository';
 
 jest.mock('mammoth', () => ({
   extractRawText: jest.fn(),
@@ -148,6 +149,26 @@ describe('POST /api/admin/questions/import', () => {
 
     expect(res.status).toBe(400);
     expect(typeof res.body.error).toBe('string');
+  });
+
+  it('returns a distinct error when insertQuestions fails, instead of blaming the file format', async () => {
+    mockDocxText(['? TEST_IMPORT_DB xatosi bormi?', '+ Togri', '= Xato'].join('\n'));
+
+    const insertSpy = jest
+      .spyOn(questionRepository, 'insertQuestions')
+      .mockRejectedValueOnce(new Error('db error'));
+
+    const res = await request(app)
+      .post('/api/admin/questions/import')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', Buffer.from('dummy'), 'questions.docx')
+      .field('category', 'umumiy_bilim');
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe('Savollarni saqlashda xatolik yuz berdi');
+    expect(res.body.error).not.toBe("Fayl o'qib bo'lmadi - .docx formatida ekanligiga ishonch hosil qiling");
+
+    insertSpy.mockRestore();
   });
 
   it('rejects a Multer error other than file-too-large without claiming the file is too large', async () => {

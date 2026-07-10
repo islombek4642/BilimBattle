@@ -89,15 +89,10 @@ adminApiRouter.post(
       return;
     }
 
+    let rawText: string;
     try {
-      const { value: rawText } = await mammoth.extractRawText({ buffer: file.buffer });
-      const { questions, errors } = parseQuestionsText(rawText);
-
-      if (questions.length > 0) {
-        await insertQuestions(resolvedCategory.key, questions);
-      }
-
-      res.json({ category: resolvedCategory, inserted: questions.length, errors });
+      const extracted = await mammoth.extractRawText({ buffer: file.buffer });
+      rawText = extracted.value;
     } catch {
       // A file that passes the .docx extension check but isn't actually a
       // valid docx (renamed .txt, truncated upload, corrupt zip) makes
@@ -105,6 +100,24 @@ adminApiRouter.post(
       // JSON like every other route, instead of falling through to
       // Express's default HTML error page.
       res.status(400).json({ error: "Fayl o'qib bo'lmadi - .docx formatida ekanligiga ishonch hosil qiling" });
+      return;
     }
+
+    const { questions, errors } = parseQuestionsText(rawText);
+
+    if (questions.length > 0) {
+      try {
+        await insertQuestions(resolvedCategory.key, questions);
+      } catch {
+        // Distinct from the mammoth catch above: this is a DB/storage failure
+        // partway through (or after) a successfully-parsed file, not a bad
+        // file format - telling the admin their file is malformed here would
+        // be misleading and could send them chasing a non-existent problem.
+        res.status(500).json({ error: 'Savollarni saqlashda xatolik yuz berdi' });
+        return;
+      }
+    }
+
+    res.json({ category: resolvedCategory, inserted: questions.length, errors });
   }
 );
