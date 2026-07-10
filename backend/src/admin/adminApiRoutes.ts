@@ -37,13 +37,20 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-// Wraps multer's own error (e.g. file too large) into the same
-// { error: string } JSON shape every other route on this router uses,
-// instead of falling through to Express's default HTML error page.
+// Wraps multer's own error (e.g. file too large, or a field name other than
+// "file") into the same { error: string } JSON shape every other route on
+// this router uses, instead of falling through to Express's default HTML
+// error page. LIMIT_FILE_SIZE gets its own specific message; every other
+// MulterError code (e.g. LIMIT_UNEXPECTED_FILE from a wrong field name or a
+// second attached file) gets a generic one instead of misreporting size.
 function handleUpload(req: Request, res: Response, next: NextFunction): void {
   upload.single('file')(req, res, (err: unknown) => {
     if (err instanceof multer.MulterError) {
-      res.status(400).json({ error: 'Fayl hajmi juda katta (maksimal 5MB)' });
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        res.status(400).json({ error: 'Fayl hajmi juda katta (maksimal 5MB)' });
+        return;
+      }
+      res.status(400).json({ error: 'Faylni yuklashda xatolik yuz berdi' });
       return;
     }
     if (err) {
@@ -82,13 +89,22 @@ adminApiRouter.post(
       return;
     }
 
-    const { value: rawText } = await mammoth.extractRawText({ buffer: file.buffer });
-    const { questions, errors } = parseQuestionsText(rawText);
+    try {
+      const { value: rawText } = await mammoth.extractRawText({ buffer: file.buffer });
+      const { questions, errors } = parseQuestionsText(rawText);
 
-    if (questions.length > 0) {
-      await insertQuestions(resolvedCategory.key, questions);
+      if (questions.length > 0) {
+        await insertQuestions(resolvedCategory.key, questions);
+      }
+
+      res.json({ category: resolvedCategory, inserted: questions.length, errors });
+    } catch {
+      // A file that passes the .docx extension check but isn't actually a
+      // valid docx (renamed .txt, truncated upload, corrupt zip) makes
+      // mammoth throw - caught here so the response stays { error: string }
+      // JSON like every other route, instead of falling through to
+      // Express's default HTML error page.
+      res.status(400).json({ error: "Fayl o'qib bo'lmadi - .docx formatida ekanligiga ishonch hosil qiling" });
     }
-
-    res.json({ category: resolvedCategory, inserted: questions.length, errors });
   }
 );

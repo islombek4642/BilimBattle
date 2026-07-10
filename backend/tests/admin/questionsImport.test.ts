@@ -137,6 +137,30 @@ describe('POST /api/admin/questions/import', () => {
     expect(categoryRows.rows.length).toBe(1);
   });
 
+  it('rejects a corrupt/invalid docx that mammoth fails to parse', async () => {
+    (mammoth.extractRawText as jest.Mock).mockRejectedValue(new Error('corrupt file'));
+
+    const res = await request(app)
+      .post('/api/admin/questions/import')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', Buffer.from('dummy'), 'questions.docx')
+      .field('category', 'umumiy_bilim');
+
+    expect(res.status).toBe(400);
+    expect(typeof res.body.error).toBe('string');
+  });
+
+  it('rejects a Multer error other than file-too-large without claiming the file is too large', async () => {
+    const res = await request(app)
+      .post('/api/admin/questions/import')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('wrongFieldName', Buffer.from('dummy'), 'questions.docx')
+      .field('category', 'umumiy_bilim');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).not.toMatch(/hajmi juda katta/);
+  });
+
   it('imports the valid blocks and reports errors for invalid ones in the same file', async () => {
     mockDocxText(
       [
