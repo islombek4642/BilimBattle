@@ -1,4 +1,4 @@
-process.env.ADMIN_TELEGRAM_ID = '9999';
+process.env.ADMIN_TELEGRAM_ID = '88888';
 
 import express from 'express';
 import request from 'supertest';
@@ -23,7 +23,7 @@ describe('POST /api/admin/questions/import', () => {
   let adminToken: string;
 
   beforeAll(async () => {
-    const admin = await upsertUser(9999, 'admin', 'Admin', null);
+    const admin = await upsertUser(88888, 'admin', 'Admin', null);
     adminToken = signSession({ userId: admin.id, telegramId: admin.telegramId });
   });
 
@@ -34,7 +34,7 @@ describe('POST /api/admin/questions/import', () => {
   });
 
   afterAll(async () => {
-    await pool.query(`DELETE FROM users WHERE telegram_id = 9999`);
+    await pool.query(`DELETE FROM users WHERE telegram_id = 88888`);
     await pool.end();
   });
 
@@ -47,7 +47,7 @@ describe('POST /api/admin/questions/import', () => {
   });
 
   it('rejects a non-admin session', async () => {
-    const nonAdmin = await upsertUser(9998, 'notadmin', 'NotAdmin', null);
+    const nonAdmin = await upsertUser(88889, 'notadmin', 'NotAdmin', null);
     const token = signSession({ userId: nonAdmin.id, telegramId: nonAdmin.telegramId });
 
     const res = await request(app)
@@ -57,7 +57,7 @@ describe('POST /api/admin/questions/import', () => {
       .field('category', 'umumiy_bilim');
 
     expect(res.status).toBe(403);
-    await pool.query(`DELETE FROM users WHERE telegram_id = 9998`);
+    await pool.query(`DELETE FROM users WHERE telegram_id = 88889`);
   });
 
   it('rejects a file that is not .docx', async () => {
