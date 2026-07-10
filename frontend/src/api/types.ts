@@ -70,3 +70,14 @@ export interface AdminStats {
   daily: AdminDailyStat[];
   users: AdminUserEntry[];
 }
+
+export interface QuestionImportError {
+  line: number;
+  message: string;
+}
+
+export interface QuestionImportResult {
+  category: Category;
+  inserted: number;
+  errors: QuestionImportError[];
+}
