@@ -71,6 +71,18 @@ describe('parseQuestionsText', () => {
     expect(result.questions).toEqual([{ text: 'Savol?', options: ["To'g'ri", 'Xato'], correctIndex: 0 }]);
   });
 
+  it('reports an error when the correct answer marker has empty text', () => {
+    const result = parseQuestionsText(['? Savol?', '+', '= Xato'].join('\n'));
+    expect(result.questions).toEqual([]);
+    expect(result.errors).toEqual([{ line: 1, message: "javob matni bo'sh" }]);
+  });
+
+  it('reports an error when a wrong answer marker has empty text', () => {
+    const result = parseQuestionsText(['? Savol?', "+ To'g'ri", '='].join('\n'));
+    expect(result.questions).toEqual([]);
+    expect(result.errors).toEqual([{ line: 1, message: "javob matni bo'sh" }]);
+  });
+
   it('preserves the original document order of options, with correctIndex pointing at the "+"-marked one', () => {
     const result = parseQuestionsText(
       ['? Savol?', '= Birinchi (xato)', '= Ikkinchi (xato)', "+ Uchinchi (to'g'ri)", '= Tortinchi (xato)'].join('\n')
