@@ -22,6 +22,12 @@ describe('AdminScreen', () => {
     expect(screen.getByText(/Yuklanmoqda/)).toBeInTheDocument();
   });
 
+  it('still renders the question import form while stats are loading', () => {
+    vi.spyOn(adminApi, 'getAdminStats').mockReturnValue(new Promise(() => {}));
+    render(<AdminScreen />);
+    expect(screen.getByText("Savol qo'shish")).toBeInTheDocument();
+  });
+
   it('renders summary cards and the daily table once stats load', async () => {
     vi.spyOn(adminApi, 'getAdminStats').mockResolvedValue({
       summary: { totalUsers: 42, invitedUsers: 10, totalHumanMatches: 30, totalBotMatches: 5, returningUsers: 8 },
@@ -85,5 +91,14 @@ describe('AdminScreen', () => {
     render(<AdminScreen />);
 
     await waitFor(() => expect(screen.getByText(/Statistikani yuklab bo'lmadi/)).toBeInTheDocument());
+  });
+
+  it('still renders the question import form when stats fail to load', async () => {
+    vi.spyOn(adminApi, 'getAdminStats').mockRejectedValue(new Error('forbidden'));
+
+    render(<AdminScreen />);
+
+    await waitFor(() => expect(screen.getByText(/Statistikani yuklab bo'lmadi/)).toBeInTheDocument());
+    expect(screen.getByText("Savol qo'shish")).toBeInTheDocument();
   });
 });
