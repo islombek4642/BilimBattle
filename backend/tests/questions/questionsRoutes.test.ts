@@ -1,10 +1,15 @@
 import express from 'express';
 import request from 'supertest';
+import { pool } from '../../src/config/db';
 import { questionsRouter } from '../../src/questions/questionsRoutes';
 
 describe('GET /api/categories', () => {
   const app = express();
   app.use('/api', questionsRouter);
+
+  afterAll(async () => {
+    await pool.end();
+  });
 
   it('returns the list of categories, including the two seeded defaults', async () => {
     const res = await request(app).get('/api/categories');
