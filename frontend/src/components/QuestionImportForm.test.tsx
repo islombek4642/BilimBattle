@@ -126,4 +126,40 @@ describe('QuestionImportForm', () => {
 
     await screen.findByText('Bunday turkum topilmadi');
   });
+
+  it('disables the category select, new-category input and file input while uploading', async () => {
+    vi.spyOn(adminApi, 'importQuestions').mockReturnValue(new Promise(() => {}));
+
+    render(<QuestionImportForm />);
+    await screen.findByText('Umumiy bilim');
+
+    fireEvent.change(screen.getByLabelText('Turkum'), { target: { value: '__new__' } });
+    fireEvent.change(screen.getByLabelText('Yangi turkum nomi'), { target: { value: 'Tarix' } });
+    const file = new File(['dummy'], 'savollar.docx');
+    fireEvent.change(screen.getByLabelText('Fayl'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Yuklash' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Turkum')).toBeDisabled());
+    expect(screen.getByLabelText('Yangi turkum nomi')).toBeDisabled();
+    expect(screen.getByLabelText('Fayl')).toBeDisabled();
+  });
+
+  it('resets the file input after a successful upload', async () => {
+    vi.spyOn(adminApi, 'importQuestions').mockResolvedValue({
+      category: { key: 'umumiy_bilim', label: 'Umumiy bilim' },
+      inserted: 5,
+      errors: [],
+    });
+
+    render(<QuestionImportForm />);
+    await screen.findByText('Umumiy bilim');
+
+    const file = new File(['dummy'], 'savollar.docx');
+    fireEvent.change(screen.getByLabelText('Fayl'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Yuklash' }));
+
+    await screen.findByText(/5 ta savol qo'shildi/);
+
+    expect((screen.getByLabelText('Fayl') as HTMLInputElement).value).toBeFalsy();
+  });
 });

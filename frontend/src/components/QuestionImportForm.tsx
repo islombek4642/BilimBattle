@@ -13,6 +13,7 @@ export function QuestionImportForm() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [newCategoryLabel, setNewCategoryLabel] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<QuestionImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +43,7 @@ export function QuestionImportForm() {
     const formData = new FormData();
     formData.append('file', file);
     if (isNewCategory) {
-      formData.append('newCategoryLabel', newCategoryLabel);
+      formData.append('newCategoryLabel', newCategoryLabel.trim());
     } else {
       formData.append('category', selectedCategory);
     }
@@ -56,6 +57,7 @@ export function QuestionImportForm() {
         setNewCategoryLabel('');
       }
       setFile(null);
+      setFileInputKey((k) => k + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Noma'lum xatolik yuz berdi");
     } finally {
@@ -70,7 +72,12 @@ export function QuestionImportForm() {
       <select
         aria-label="Turkum"
         value={selectedCategory}
-        onChange={(e) => setSelectedCategory(e.target.value)}
+        disabled={uploading}
+        onChange={(e) => {
+          setSelectedCategory(e.target.value);
+          setError(null);
+          setResult(null);
+        }}
         className="rounded-xl border border-ios-divider bg-ios-bg px-3 py-2 text-sm text-ios-label"
       >
         {categories.map((c) => (
@@ -86,17 +93,28 @@ export function QuestionImportForm() {
           type="text"
           aria-label="Yangi turkum nomi"
           value={newCategoryLabel}
-          onChange={(e) => setNewCategoryLabel(e.target.value)}
+          disabled={uploading}
+          onChange={(e) => {
+            setNewCategoryLabel(e.target.value);
+            setError(null);
+            setResult(null);
+          }}
           placeholder="Turkum nomi"
           className="rounded-xl border border-ios-divider bg-ios-bg px-3 py-2 text-sm text-ios-label"
         />
       )}
 
       <input
+        key={fileInputKey}
         type="file"
         aria-label="Fayl"
         accept=".docx"
-        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        disabled={uploading}
+        onChange={(e) => {
+          setFile(e.target.files?.[0] ?? null);
+          setError(null);
+          setResult(null);
+        }}
       />
 
       <button
