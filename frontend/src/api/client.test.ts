@@ -1,6 +1,6 @@
 // frontend/src/api/client.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { apiGet, apiPost, ApiError, getAvatarUrl } from './client';
+import { apiGet, apiPost, apiPostForm, ApiError, getAvatarUrl } from './client';
 
 describe('api/client', () => {
   beforeEach(() => {
@@ -39,6 +39,20 @@ describe('api/client', () => {
     const [, options] = (fetch as any).mock.calls[0];
     expect(options.method).toBe('POST');
     expect(JSON.parse(options.body)).toEqual({ a: 1 });
+  });
+
+  it('apiPostForm sends a FormData body without forcing a JSON Content-Type', async () => {
+    (fetch as any).mockResolvedValue({ ok: true, json: () => Promise.resolve({ inserted: 1 }) });
+
+    const formData = new FormData();
+    formData.append('category', 'umumiy_bilim');
+    await apiPostForm('/admin/questions/import', formData, 'my-token');
+
+    const [, options] = (fetch as any).mock.calls[0];
+    expect(options.method).toBe('POST');
+    expect(options.body).toBe(formData);
+    expect(options.headers['Content-Type']).toBeUndefined();
+    expect(options.headers.Authorization).toBe('Bearer my-token');
   });
 
   it('throws an ApiError with the response status and server error message on failure', async () => {

@@ -21,7 +21,10 @@ interface ErrorBody {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
-  if (options.body) {
+  // Skip forcing JSON's Content-Type for a FormData body - the browser must
+  // set its own multipart/form-data header (with the correct boundary
+  // string), which it only does when Content-Type is left unset.
+  if (options.body && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -55,6 +58,14 @@ export function apiPost<T>(path: string, data: unknown, token?: string): Promise
   return request<T>(path, {
     method: 'POST',
     body: JSON.stringify(data),
+    headers: authHeaders(token),
+  });
+}
+
+export function apiPostForm<T>(path: string, formData: FormData, token?: string): Promise<T> {
+  return request<T>(path, {
+    method: 'POST',
+    body: formData,
     headers: authHeaders(token),
   });
 }
