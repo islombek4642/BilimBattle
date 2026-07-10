@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getAdminStats } from '../api/admin';
 import { openTelegramProfile } from '../telegram/webApp';
 import { AdminStats } from '../api/types';
+import { QuestionImportForm } from '../components/QuestionImportForm';
 
 export function AdminScreen() {
   const { token } = useAuth();
@@ -133,6 +134,8 @@ export function AdminScreen() {
           );
         })}
       </div>
+
+      <QuestionImportForm />
     </div>
   );
 }

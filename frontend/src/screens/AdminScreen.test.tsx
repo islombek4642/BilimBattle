@@ -5,6 +5,7 @@ import { AdminScreen } from './AdminScreen';
 import * as authContext from '../context/AuthContext';
 import * as adminApi from '../api/admin';
 import * as telegram from '../telegram/webApp';
+import * as questionsApi from '../api/questions';
 
 describe('AdminScreen', () => {
   beforeEach(() => {
@@ -12,6 +13,7 @@ describe('AdminScreen', () => {
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
       token: 'tok', user: { id: 1, telegramId: 9999 } as any, loading: false, error: null,
     });
+    vi.spyOn(questionsApi, 'getCategories').mockResolvedValue({ categories: [] });
   });
 
   it('shows a loading state while stats are being fetched', () => {
