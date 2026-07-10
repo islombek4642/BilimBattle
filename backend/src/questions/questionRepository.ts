@@ -40,11 +40,15 @@ export async function isValidCategory(key: string): Promise<boolean> {
 }
 
 function slugifyCategoryLabel(label: string): string {
-  return label
+  const slug = label
     .toLowerCase()
     .replace(/['"`]/g, '')
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
+  // A label with no ASCII letters/digits at all (e.g. a purely Cyrillic name,
+  // or pure punctuation) would otherwise slugify to '' - fall back to a
+  // non-empty placeholder so createCategory never inserts an empty key.
+  return slug || 'category';
 }
 
 // Reuses an existing category if one already has this exact label

@@ -52,6 +52,7 @@ describe('questionRepository', () => {
   describe('createCategory', () => {
     afterEach(async () => {
       await pool.query(`DELETE FROM categories WHERE key LIKE 'test_repo_%'`);
+      await pool.query(`DELETE FROM categories WHERE key LIKE 'category%'`);
     });
 
     it('creates a new category with a slugified key', async () => {
@@ -67,6 +68,13 @@ describe('questionRepository', () => {
 
       const all = await getCategories();
       expect(all.filter((c) => c.key === first.key).length).toBe(1);
+    });
+
+    it('falls back to a non-empty key when the label has no Latin letters or digits', async () => {
+      const category = await createCategory('Тарих');
+      expect(category.key).toBe('category');
+      expect(category.key).not.toBe('');
+      expect(category.key.startsWith('_')).toBe(false);
     });
   });
 
