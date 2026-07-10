@@ -66,7 +66,7 @@ function runSerialized<T>(category: string, fn: () => Promise<T>): Promise<T> {
 }
 
 export async function handleJoinQueue(io: AppServer, socketId: string, userId: number, category: string): Promise<void> {
-  if (!isValidCategory(category)) return;
+  if (!(await isValidCategory(category))) return;
 
   // Idempotency guard: a duplicate join_queue call (double-tap, client
   // retry) for a user already waiting must be ignored. Without this,

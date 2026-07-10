@@ -98,25 +98,28 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     // Fire-and-forget from Node's perspective: Socket.io invokes this async
     // handler but never awaits or catches its returned promise (that only
     // happens for emits that use an ack callback, which this event doesn't).
-    // An unhandled rejection here (e.g. Redis blip inside createInvite) would
-    // otherwise crash the process, same hazard already noted on the
-    // 'disconnect' handler below - so this is wrapped in .catch() too.
-    socket.on('create_invite', ({ category }: { category: string }) => {
-      if (!isValidCategory(category)) return;
-      // Refuse to create an invite while this socket is already in an active
-      // game - otherwise a stray create_invite mid-match would let a friend
-      // later join_invite and double-book this user into a second match on
-      // top of the one they're already playing.
-      if (socket.data.gameId) return;
-      const telegramId = socket.data.telegramId;
-      createInvite(telegramId, { category, socketId: socket.id, userId: socket.data.userId })
-        .then(() => socket.emit('invite_created'))
-        .catch((err) => {
-          console.error(`socketServer: failed to create invite for telegramId ${telegramId}`, err);
-        });
+    // An unhandled rejection here (e.g. Redis blip inside createInvite, or
+    // the isValidCategory query below) would otherwise crash the process,
+    // same hazard already noted on the 'disconnect' handler below - so the
+    // whole body is wrapped in try/catch.
+    socket.on('create_invite', async ({ category }: { category: string }) => {
+      try {
+        if (!(await isValidCategory(category))) return;
+        // Refuse to create an invite while this socket is already in an
+        // active game - otherwise a stray create_invite mid-match would let
+        // a friend later join_invite and double-book this user into a
+        // second match on top of the one they're already playing.
+        if (socket.data.gameId) return;
+        const telegramId = socket.data.telegramId;
+        await createInvite(telegramId, { category, socketId: socket.id, userId: socket.data.userId });
+        socket.emit('invite_created');
+      } catch (err) {
+        console.error(`socketServer: failed to create invite for telegramId ${socket.data.telegramId}`, err);
+      }
     });
 
-    // Same fire-and-forget hazard as create_invite above - wrapped in .catch().
+    // Same fire-and-forget hazard as create_invite above - wrapped in
+    // try/catch since isValidCategory now also awaits a DB query.
     // Note: the invitee's own `category` here is intentionally NOT forwarded
     // to createMatch. The match is played in the category the INVITER
     // originally queued for (invite.category, stored server-side when the
@@ -124,49 +127,49 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     // to silently redirect the match to a different category. We still
     // validate the invitee's category so a malformed/garbage payload is
     // rejected up front, but it otherwise carries no weight in this handler.
-    socket.on('join_invite', ({ inviterTelegramId, category }: { inviterTelegramId: number; category: string }) => {
-      // inviterTelegramId comes straight from client input, unlike category
-      // which is checked by isValidCategory below - without this guard a
-      // malformed payload (string, NaN, object) would silently build a
-      // harmless-but-wrong Redis key via inviteKey() instead of being
-      // rejected cleanly up front.
-      if (typeof inviterTelegramId !== 'number' || !Number.isFinite(inviterTelegramId)) return;
-      if (!isValidCategory(category)) return;
-      // Refuse to consume the invite if THIS socket (the invitee) is already
-      // mid-match - see the matching comment on create_invite above for why.
-      if (socket.data.gameId) return;
+    socket.on('join_invite', async ({ inviterTelegramId, category }: { inviterTelegramId: number; category: string }) => {
+      try {
+        // inviterTelegramId comes straight from client input, unlike
+        // category which is checked by isValidCategory below - without this
+        // guard a malformed payload (string, NaN, object) would silently
+        // build a harmless-but-wrong Redis key via inviteKey() instead of
+        // being rejected cleanly up front.
+        if (typeof inviterTelegramId !== 'number' || !Number.isFinite(inviterTelegramId)) return;
+        if (!(await isValidCategory(category))) return;
+        // Refuse to consume the invite if THIS socket (the invitee) is
+        // already mid-match - see the matching comment on create_invite
+        // above for why.
+        if (socket.data.gameId) return;
 
-      consumeInvite(inviterTelegramId)
-        .then(async (invite) => {
-          if (!invite) {
-            socket.emit('invite_expired');
-            return;
-          }
+        const invite = await consumeInvite(inviterTelegramId);
+        if (!invite) {
+          socket.emit('invite_expired');
+          return;
+        }
 
-          // Look up the inviter's CURRENT live socket via activeSocketsByUser
-          // rather than trusting invite.socketId, which is a snapshot taken
-          // when create_invite ran and can go stale (inviter reconnected,
-          // got a new socket id, or - the case this guard exists for -
-          // started or finished an unrelated match since then). Using the
-          // stale id for the "already in a match" check would miss exactly
-          // the double-booking scenario it's meant to catch.
-          const inviterCurrentSocketId = activeSocketsByUser.get(invite.userId);
-          const inviterSocket = inviterCurrentSocketId ? io!.sockets.sockets.get(inviterCurrentSocketId) : undefined;
-          if (inviterSocket?.data.gameId) {
-            socket.emit('invite_expired');
-            return;
-          }
+        // Look up the inviter's CURRENT live socket via activeSocketsByUser
+        // rather than trusting invite.socketId, which is a snapshot taken
+        // when create_invite ran and can go stale (inviter reconnected, got
+        // a new socket id, or - the case this guard exists for - started or
+        // finished an unrelated match since then). Using the stale id for
+        // the "already in a match" check would miss exactly the
+        // double-booking scenario it's meant to catch.
+        const inviterCurrentSocketId = activeSocketsByUser.get(invite.userId);
+        const inviterSocket = inviterCurrentSocketId ? io!.sockets.sockets.get(inviterCurrentSocketId) : undefined;
+        if (inviterSocket?.data.gameId) {
+          socket.emit('invite_expired');
+          return;
+        }
 
-          await createMatch(
-            io!,
-            invite.category,
-            { userId: invite.userId, socketId: inviterSocket?.id ?? invite.socketId },
-            { userId: socket.data.userId, socketId: socket.id }
-          );
-        })
-        .catch((err) => {
-          console.error(`socketServer: failed to join invite from inviterTelegramId ${inviterTelegramId}`, err);
-        });
+        await createMatch(
+          io!,
+          invite.category,
+          { userId: invite.userId, socketId: inviterSocket?.id ?? invite.socketId },
+          { userId: socket.data.userId, socketId: socket.id }
+        );
+      } catch (err) {
+        console.error(`socketServer: failed to join invite from inviterTelegramId ${inviterTelegramId}`, err);
+      }
     });
 
     // Not `async (...) => {}` - same fire-and-forget hazard as submit_answer/
