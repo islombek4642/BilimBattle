@@ -11,7 +11,12 @@ export interface PlayerInfo {
   isBot?: boolean;
 }
 
-const QUESTIONS_PER_GAME = 7;
+const QUESTIONS_PER_GAME = 15;
+// A player's HP is derived, not stored: myHP = HP_MAX - opponentScore. So
+// "opponent's score has reached HP_MAX" and "opponent's HP has reached 0"
+// are the exact same condition - this constant is the only new piece of
+// state this feature needs.
+const HP_MAX = 500;
 // In-process only (not persisted, not shared across instances). A game that
 // never reaches finishGame (process crash, or a player abandoning mid-game
 // with no reconnect support yet) simply leaves its entry here until the
@@ -158,6 +163,19 @@ async function resolveQuestion(gameId: string): Promise<void> {
   if (env.resultRevealMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, env.resultRevealMs));
   }
+
+  // A player's score reaching HP_MAX means the OPPONENT's derived HP has
+  // reached 0 - end the match right now instead of waiting for the
+  // remaining questions. If both players cross HP_MAX in the very same
+  // round (both answered this question correctly), finishGame's existing
+  // winner-determination logic (higher score wins, exact tie = draw)
+  // handles it correctly with no extra logic needed here.
+  const anyoneKnockedOut = game.players.some((p) => p.score >= HP_MAX);
+  if (anyoneKnockedOut) {
+    await finishGame(gameId, { knockout: true });
+    return;
+  }
+
   await sendNextQuestion(gameId);
 }
 
@@ -212,7 +230,7 @@ function clearSocketGameId(players: { socketId: string }[]): void {
   }
 }
 
-async function finishGame(gameId: string): Promise<void> {
+async function finishGame(gameId: string, opts?: { knockout?: boolean }): Promise<void> {
   const game = await getGame(gameId);
   if (!game) return;
   game.status = 'finished';
@@ -223,6 +241,7 @@ async function finishGame(gameId: string): Promise<void> {
   getIO().to(gameId).emit('game_over', {
     scores: game.players.map((p) => ({ userId: p.userId, score: p.score })),
     winnerId,
+    knockout: opts?.knockout ?? false,
   });
 
   await persistMatchResult(gameId, {

@@ -6,6 +6,7 @@ import { getGame } from '../../src/game/gameState';
 import { upsertUser } from '../../src/users/userRepository';
 import { env } from '../../src/config/env';
 import { randomUUID } from 'crypto';
+import * as questionRepository from '../../src/questions/questionRepository';
 
 // See gameEngineDisconnect.test.ts's identical helper for why this specific
 // combination (fake setTimeout/setInterval, real nextTick/setImmediate/
@@ -44,6 +45,27 @@ function createFakeIO() {
   return { fakeIO, events, sockets };
 }
 
+// A match can now end before all questions are used up (knockout), so tests
+// that just want to play a match TO COMPLETION (regardless of exactly how
+// many rounds that takes) poll for game_over instead of assuming a fixed
+// round count. maxRounds is a safety cap so a genuine bug (game_over never
+// firing) fails fast with a clear "ran out of rounds" symptom instead of
+// hanging.
+async function playRoundsUntilGameOver(
+  gameId: string,
+  player1Id: number,
+  player2Id: number,
+  events: { event: string }[],
+  maxRounds = 20
+): Promise<void> {
+  let rounds = 0;
+  while (!events.some((e) => e.event === 'game_over') && rounds < maxRounds) {
+    await submitAnswer(gameId, player1Id, 0);
+    await submitAnswer(gameId, player2Id, 1);
+    rounds += 1;
+  }
+}
+
 describe('gameEngine full match flow', () => {
   let player1Id: number;
   let player2Id: number;
@@ -62,20 +84,14 @@ describe('gameEngine full match flow', () => {
     await closeRedis();
   });
 
-  it('runs a full 7-question match and persists the result', async () => {
+  it('runs a match to completion and persists the result', async () => {
     const { fakeIO, events } = createFakeIO();
     setIOForTesting(fakeIO as any);
 
     const gameId = randomUUID();
     await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' });
 
-    for (let i = 0; i < 7; i += 1) {
-      const questionEvent = events.filter((e) => e.event === 'question')[i];
-      expect(questionEvent).toBeDefined();
-
-      await submitAnswer(gameId, player1Id, 0);
-      await submitAnswer(gameId, player2Id, 1);
-    }
+    await playRoundsUntilGameOver(gameId, player1Id, player2Id, events);
 
     const gameOverEvent = events.find((e) => e.event === 'game_over');
     expect(gameOverEvent).toBeDefined();
@@ -109,11 +125,7 @@ describe('gameEngine full match flow', () => {
     fakeIO.sockets.sockets.get('sockA')!.data.gameId = gameId;
     fakeIO.sockets.sockets.get('sockB')!.data.gameId = gameId;
 
-    for (let i = 0; i < 7; i += 1) {
-      expect(events.filter((e) => e.event === 'question')[i]).toBeDefined();
-      await submitAnswer(gameId, player1Id, 0);
-      await submitAnswer(gameId, player2Id, 1);
-    }
+    await playRoundsUntilGameOver(gameId, player1Id, player2Id, events);
 
     expect(events.find((e) => e.event === 'game_over')).toBeDefined();
     expect(sockets.get('sockA')!.data.gameId).toBeUndefined();
@@ -162,7 +174,7 @@ describe('gameEngine full match flow', () => {
   });
 
   it('ignores a second answer submission for the same question', async () => {
-    const { fakeIO } = createFakeIO();
+    const { fakeIO, events } = createFakeIO();
     setIOForTesting(fakeIO as any);
 
     const gameId = randomUUID();
@@ -186,10 +198,7 @@ describe('gameEngine full match flow', () => {
     // closed" noise on every run. Finishing the match lets finishGame() clear
     // and delete all game state cleanly, with no leftover timer.
     await submitAnswer(gameId, player2Id, 1);
-    for (let i = 1; i < 7; i += 1) {
-      await submitAnswer(gameId, player1Id, 0);
-      await submitAnswer(gameId, player2Id, 1);
-    }
+    await playRoundsUntilGameOver(gameId, player1Id, player2Id, events);
   });
 
   it('still cleans up the game from Redis when recordMatchResult fails (e.g. an FK violation from a bogus userId)', async () => {
@@ -216,10 +225,7 @@ describe('gameEngine full match flow', () => {
       { userId: bogusUserId, socketId: 'sock2' }
     );
 
-    for (let i = 0; i < 7; i += 1) {
-      await submitAnswer(gameId, player1Id, 0);
-      await submitAnswer(gameId, bogusUserId, 1);
-    }
+    await playRoundsUntilGameOver(gameId, player1Id, bogusUserId, events);
 
     // The match still completed from the clients' point of view...
     const gameOverEvent = events.find((e) => e.event === 'game_over');
@@ -247,5 +253,97 @@ describe('gameEngine full match flow', () => {
     expect(gameAfter).toBeNull();
 
     errorSpy.mockRestore();
+  });
+
+  describe('HP/knockout mechanic', () => {
+    function fixedQuestions(count: number) {
+      return Array.from({ length: count }, (_, i) => ({
+        id: 9000 + i,
+        text: `Mock savol ${i}`,
+        options: ["To'g'ri", 'Xato'],
+        correctIndex: 0,
+      }));
+    }
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it("ends the match immediately via knockout once a player's score reaches 500, without waiting for all 15 questions", async () => {
+      jest.spyOn(questionRepository, 'getRandomQuestions').mockResolvedValue(fixedQuestions(15));
+
+      const { fakeIO, events } = createFakeIO();
+      setIOForTesting(fakeIO as any);
+
+      const gameId = randomUUID();
+      await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' });
+
+      // player1 always answers correctly (option 0, matching every mock
+      // question's correctIndex), player2 always wrong (option 1). Near-
+      // instant answers score close to the 200-point max (100 base + ~100
+      // speed bonus), so player1 crosses HP_MAX=500 within 3 rounds.
+      await playRoundsUntilGameOver(gameId, player1Id, player2Id, events);
+
+      const questionEvents = events.filter((e) => e.event === 'question');
+      expect(questionEvents.length).toBeLessThan(15);
+
+      const gameOverEvent = events.find((e) => e.event === 'game_over');
+      expect(gameOverEvent).toBeDefined();
+      const payload = gameOverEvent!.payload as { winnerId: number | null; knockout: boolean };
+      expect(payload.winnerId).toBe(player1Id);
+      expect(payload.knockout).toBe(true);
+    });
+
+    it('ends the match without a knockout once the question pool is exhausted, if neither player reaches 500', async () => {
+      // Both players always answer wrong - scores stay 0-0 the whole match,
+      // so it can only end via the question pool running out (here, 3
+      // questions), never via knockout.
+      jest.spyOn(questionRepository, 'getRandomQuestions').mockResolvedValue(fixedQuestions(3));
+
+      const { fakeIO, events } = createFakeIO();
+      setIOForTesting(fakeIO as any);
+
+      const gameId = randomUUID();
+      await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' });
+
+      for (let i = 0; i < 3; i += 1) {
+        await submitAnswer(gameId, player1Id, 1);
+        await submitAnswer(gameId, player2Id, 1);
+      }
+
+      const gameOverEvent = events.find((e) => e.event === 'game_over');
+      expect(gameOverEvent).toBeDefined();
+      const payload = gameOverEvent!.payload as { winnerId: number | null; knockout: boolean };
+      expect(payload.winnerId).toBeNull();
+      expect(payload.knockout).toBe(false);
+    });
+
+    it('does not mark a normal (non-knockout) match completion as a knockout', async () => {
+      // 2-question pool, player1 answers correctly both times (~200/round,
+      // ~400 total - comfortably under HP_MAX=500 the whole match). The
+      // match ends because the pool ran out, not because anyone was
+      // knocked out, even though player1 clearly won on points. (Using a
+      // 3-question pool here instead would have player1 cross 500 on the
+      // final question and turn this into an actual knockout - the pool
+      // size is deliberately small enough to stay under the threshold.)
+      jest.spyOn(questionRepository, 'getRandomQuestions').mockResolvedValue(fixedQuestions(2));
+
+      const { fakeIO, events } = createFakeIO();
+      setIOForTesting(fakeIO as any);
+
+      const gameId = randomUUID();
+      await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' });
+
+      for (let i = 0; i < 2; i += 1) {
+        await submitAnswer(gameId, player1Id, 0);
+        await submitAnswer(gameId, player2Id, 1);
+      }
+
+      const gameOverEvent = events.find((e) => e.event === 'game_over');
+      expect(gameOverEvent).toBeDefined();
+      const payload = gameOverEvent!.payload as { winnerId: number | null; knockout: boolean };
+      expect(payload.winnerId).toBe(player1Id);
+      expect(payload.knockout).toBe(false);
+    });
   });
 });
