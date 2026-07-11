@@ -19,7 +19,10 @@ describe('AdminScreen', () => {
   it('shows a loading state while stats are being fetched', () => {
     vi.spyOn(adminApi, 'getAdminStats').mockReturnValue(new Promise(() => {}));
     render(<AdminScreen />);
-    expect(screen.getByText(/Yuklanmoqda/)).toBeInTheDocument();
+    // QuestionImportForm has its own independent "Yuklanmoqda..." state
+    // (while its categories fetch is pending) that coexists with this
+    // screen's own stats-loading text - hence getAllByText, not getByText.
+    expect(screen.getAllByText(/Yuklanmoqda/).length).toBeGreaterThan(0);
   });
 
   it('still renders the question import form while stats are loading', () => {

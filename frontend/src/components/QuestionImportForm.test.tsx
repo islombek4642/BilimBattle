@@ -23,6 +23,27 @@ describe('QuestionImportForm', () => {
     });
   });
 
+  it('shows a loading state and withholds the form until categories are fetched', async () => {
+    // Regression: the select used to render immediately with an empty
+    // options list, then silently repopulate once getCategories() resolved
+    // - a visible "pop-in" moment. Now the whole form waits behind one
+    // loading state so it appears fully-formed in a single step.
+    let resolveCategories: (value: { categories: { key: string; label: string }[] }) => void;
+    vi.spyOn(questionsApi, 'getCategories').mockReturnValue(
+      new Promise((resolve) => { resolveCategories = resolve; })
+    );
+
+    render(<QuestionImportForm />);
+
+    expect(screen.getByText(/Yuklanmoqda/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Turkum')).not.toBeInTheDocument();
+
+    resolveCategories!({ categories: [{ key: 'umumiy_bilim', label: 'Umumiy bilim' }] });
+
+    await screen.findByLabelText('Turkum');
+    expect(screen.queryByText(/Yuklanmoqda/)).not.toBeInTheDocument();
+  });
+
   it('loads and shows the existing categories plus a "new category" option', async () => {
     render(<QuestionImportForm />);
 

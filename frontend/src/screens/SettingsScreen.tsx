@@ -57,6 +57,22 @@ export function SettingsScreen() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex min-h-full items-center justify-center p-6">
+        <p className="text-sm text-ios-secondary-label">Yuklanmoqda...</p>
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="flex min-h-full items-center justify-center p-6 text-center">
+        <p className="text-sm text-ios-red">Statistikani yuklab bo'lmadi.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
       <h2 className="text-lg font-bold text-ios-label">Sozlamalar</h2>
@@ -68,23 +84,18 @@ export function SettingsScreen() {
           {user?.username && <p className="text-sm text-ios-secondary-label">@{user.username}</p>}
         </div>
 
-        {!loading && !error && stats && (
-          <div className="mt-1 flex w-full items-stretch border-t border-ios-divider pt-3">
-            <div className="flex flex-1 flex-col items-center gap-0.5">
-              <span className="text-lg font-bold tabular-nums text-ios-label">{stats.gamesPlayed}</span>
-              <span className="text-xs text-ios-secondary-label">O'yinlar</span>
-            </div>
-            <div className="w-px bg-ios-divider" />
-            <div className="flex flex-1 flex-col items-center gap-0.5">
-              <span className="text-lg font-bold tabular-nums text-ios-blue">{stats.rating}</span>
-              <span className="text-xs text-ios-secondary-label">Reyting</span>
-            </div>
+        <div className="mt-1 flex w-full items-stretch border-t border-ios-divider pt-3">
+          <div className="flex flex-1 flex-col items-center gap-0.5">
+            <span className="text-lg font-bold tabular-nums text-ios-label">{stats.gamesPlayed}</span>
+            <span className="text-xs text-ios-secondary-label">O'yinlar</span>
           </div>
-        )}
+          <div className="w-px bg-ios-divider" />
+          <div className="flex flex-1 flex-col items-center gap-0.5">
+            <span className="text-lg font-bold tabular-nums text-ios-blue">{stats.rating}</span>
+            <span className="text-xs text-ios-secondary-label">Reyting</span>
+          </div>
+        </div>
       </div>
-
-      {loading && <p className="text-sm text-ios-secondary-label">Yuklanmoqda...</p>}
-      {!loading && error && <p className="text-sm text-ios-red">Statistikani yuklab bo'lmadi.</p>}
 
       <div className="flex flex-col rounded-2xl bg-ios-card px-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
         <SettingsRow
@@ -111,29 +122,25 @@ export function SettingsScreen() {
           }
         />
 
-        {!loading && !error && stats && (
-          <>
-            <SettingsRow
-              icon={Percent}
-              iconBgClass="bg-ios-green"
-              label="G'alaba foizi"
-              right={<span className="font-semibold tabular-nums text-ios-label">{stats.winRate}%</span>}
-            />
-            <SettingsRow
-              icon={Flame}
-              iconBgClass="bg-ios-orange"
-              label="Joriy seriya"
-              right={<span className="font-semibold tabular-nums text-ios-label">{stats.currentStreak}</span>}
-            />
-            <SettingsRow
-              icon={Medal}
-              iconBgClass="bg-ios-purple"
-              label="Eng uzun seriya"
-              right={<span className="font-semibold tabular-nums text-ios-label">{stats.bestStreak}</span>}
-              last
-            />
-          </>
-        )}
+        <SettingsRow
+          icon={Percent}
+          iconBgClass="bg-ios-green"
+          label="G'alaba foizi"
+          right={<span className="font-semibold tabular-nums text-ios-label">{stats.winRate}%</span>}
+        />
+        <SettingsRow
+          icon={Flame}
+          iconBgClass="bg-ios-orange"
+          label="Joriy seriya"
+          right={<span className="font-semibold tabular-nums text-ios-label">{stats.currentStreak}</span>}
+        />
+        <SettingsRow
+          icon={Medal}
+          iconBgClass="bg-ios-purple"
+          label="Eng uzun seriya"
+          right={<span className="font-semibold tabular-nums text-ios-label">{stats.bestStreak}</span>}
+          last
+        />
       </div>
 
       {isAdmin && (

@@ -66,7 +66,7 @@ describe('SettingsScreen', () => {
 
     render(<SettingsScreen />);
 
-    const toggle = screen.getByRole('switch', { name: 'Ovoz/Vibratsiya' });
+    const toggle = await screen.findByRole('switch', { name: 'Ovoz/Vibratsiya' });
     expect(toggle).toHaveAttribute('aria-checked', 'true');
 
     fireEvent.click(toggle);
@@ -85,7 +85,7 @@ describe('SettingsScreen', () => {
     });
 
     render(<SettingsScreen />);
-    const toggle = screen.getByRole('switch', { name: 'Ovoz/Vibratsiya' });
+    const toggle = await screen.findByRole('switch', { name: 'Ovoz/Vibratsiya' });
     const thumb = toggle.querySelector('span')!;
 
     expect(thumb).toHaveClass('left-0');
@@ -97,7 +97,7 @@ describe('SettingsScreen', () => {
     expect(thumb).toHaveClass('translate-x-[3px]');
   });
 
-  it('reads a previously-persisted sound-off preference on mount', () => {
+  it('reads a previously-persisted sound-off preference on mount', async () => {
     localStorage.setItem('bilimbattle:soundEnabled', 'false');
     vi.spyOn(statsApi, 'getMyStats').mockResolvedValue({
       gamesPlayed: 0, gamesWon: 0, winRate: 0, currentStreak: 0, bestStreak: 0, rating: 1000,
@@ -105,7 +105,7 @@ describe('SettingsScreen', () => {
 
     render(<SettingsScreen />);
 
-    expect(screen.getByRole('switch', { name: 'Ovoz/Vibratsiya' })).toHaveAttribute('aria-checked', 'false');
+    expect(await screen.findByRole('switch', { name: 'Ovoz/Vibratsiya' })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('shows a loading state while stats are being fetched', async () => {
@@ -151,7 +151,7 @@ describe('SettingsScreen', () => {
 
     render(<SettingsScreen />); // mocked user.telegramId is 111, matches
 
-    const button = screen.getByText('Admin statistikasi');
+    const button = await screen.findByText('Admin statistikasi');
     fireEvent.click(button);
 
     expect(navigate).toHaveBeenCalledWith({ name: 'admin' });

@@ -10,6 +10,7 @@ const NEW_CATEGORY_VALUE = '__new__';
 export function QuestionImportForm() {
   const { token } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [newCategoryLabel, setNewCategoryLabel] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -27,7 +28,8 @@ export function QuestionImportForm() {
       .catch(() => {
         // Category dropdown just stays empty - not worth a dedicated error
         // state for this secondary admin widget.
-      });
+      })
+      .finally(() => setCategoriesLoading(false));
   }, []);
 
   const isNewCategory = selectedCategory === NEW_CATEGORY_VALUE;
@@ -64,6 +66,15 @@ export function QuestionImportForm() {
       setUploading(false);
     }
   };
+
+  if (categoriesLoading) {
+    return (
+      <div className="flex flex-col gap-3 rounded-2xl bg-ios-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
+        <h3 className="text-sm font-semibold text-ios-label">Savol qo'shish</h3>
+        <p className="text-sm text-ios-secondary-label">Yuklanmoqda...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl bg-ios-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
