@@ -32,7 +32,6 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
   // question just because the `question_result` event that would normally
   // populate it was missed while offline.
   const [restoredScores, setRestoredScores] = useState<ScoreEntry[]>([]);
-  const [showKnockout, setShowKnockout] = useState(false);
 
   useEffect(() => {
     if (question && question.index !== answeredIndex) {
@@ -40,43 +39,34 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
     }
   }, [question, answeredIndex]);
 
-  // A knockout ending shows a brief "K.O.!" overlay before transitioning -
-  // flip this flag here, but don't navigate/clear state yet; the
-  // delayed-transition effect below owns that once the overlay has had its
-  // moment.
   useEffect(() => {
-    if (gameOver?.knockout) {
-      setShowKnockout(true);
+    if (!gameOver) return;
+
+    if (!gameOver.knockout) {
+      replace({
+        name: 'result',
+        scores: gameOver.scores,
+        winnerId: gameOver.winnerId,
+        forfeited: gameOver.forfeited ?? false,
+        knockout: false,
+        category,
+      });
+      clearGameOver();
+      clearQuestionResult();
+      return;
     }
-  }, [gameOver]);
 
-  // Non-knockout endings (the match ran its full course, or a player
-  // forfeited) transition immediately - no overlay, matches the original
-  // behavior exactly.
-  useEffect(() => {
-    if (!gameOver || gameOver.knockout) return;
-    replace({
-      name: 'result',
-      scores: gameOver.scores,
-      winnerId: gameOver.winnerId,
-      forfeited: gameOver.forfeited ?? false,
-      knockout: false,
-      category,
-    });
-    clearGameOver();
-    clearQuestionResult();
-  }, [gameOver, replace, clearGameOver, clearQuestionResult, category]);
-
-  // Knockout endings hold on the "K.O.!" overlay for KO_REVEAL_MS before
-  // transitioning. This MUST be its own effect with these exact
-  // dependencies (not folded into the one above, and not keyed off
-  // `showKnockout` alone) - see WaitingScreen.tsx's VS-reveal effect for the
-  // identical pattern and the production bug it was written to avoid: a
-  // cleanup tied to a dependency that changes more than once fires on every
-  // change, not just on unmount, which would immediately undo the state
-  // transition it's supposed to survive.
-  useEffect(() => {
-    if (!showKnockout || !gameOver) return;
+    // Knockout endings hold on the "K.O.!" overlay (rendered below, gated
+    // on gameOver.knockout - see the early-return in the JSX) for
+    // KO_REVEAL_MS before transitioning. The cleanup here only clears this
+    // effect's own pending timer - since `gameOver` only ever transitions
+    // null -> one fixed value -> null in this codebase (set once by the
+    // game_over socket listener, cleared once by clearGameOver() below), a
+    // single effect is sufficient; there's no risk of this cleanup firing
+    // mid-flight and wiping state the way WaitingScreen.tsx's VS-reveal
+    // effect once did (that bug involved a cleanup that reset SHARED state
+    // on every dependency change - this cleanup only clears a local timer
+    // handle, which is normal, safe React behavior).
     const timer = setTimeout(() => {
       replace({
         name: 'result',
@@ -90,7 +80,7 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
       clearQuestionResult();
     }, KO_REVEAL_MS);
     return () => clearTimeout(timer);
-  }, [showKnockout, gameOver, replace, clearGameOver, clearQuestionResult, category]);
+  }, [gameOver, replace, clearGameOver, clearQuestionResult, category]);
 
   useEffect(() => {
     if (connected) {
@@ -157,7 +147,7 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
     submitAnswer(gameId, question.index, optionIndex);
   };
 
-  if (showKnockout) {
+  if (gameOver?.knockout) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center bg-ios-bg">
         <span className="animate-ko-reveal text-6xl font-black text-ios-red">K.O.!</span>
