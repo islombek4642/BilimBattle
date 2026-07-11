@@ -1,6 +1,6 @@
 // frontend/src/screens/BattleScreen.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { BattleScreen } from './BattleScreen';
 import * as navigationContext from '../context/NavigationContext';
 import * as gameSocketContext from '../context/GameSocketContext';
@@ -115,10 +115,44 @@ describe('BattleScreen', () => {
 
     await waitFor(() =>
       expect(replace).toHaveBeenCalledWith({
-        name: 'result', scores: [{ userId: 1, score: 400 }], winnerId: 1, forfeited: false, category: 'umumiy_bilim',
+        name: 'result', scores: [{ userId: 1, score: 400 }], winnerId: 1, forfeited: false, knockout: false, category: 'umumiy_bilim',
       })
     );
     expect(clearGameOver).toHaveBeenCalledOnce();
+  });
+
+  it('shows a "K.O.!" overlay before navigating to the result screen when the match ends by knockout', async () => {
+    vi.useFakeTimers();
+    try {
+      mockSocket({
+        gameOver: {
+          scores: [{ userId: 1, score: 500 }, { userId: 2, score: 200 }],
+          winnerId: 1,
+          forfeited: false,
+          knockout: true,
+        },
+      });
+      render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+
+      expect(screen.getByText('K.O.!')).toBeInTheDocument();
+      expect(replace).not.toHaveBeenCalled();
+
+      await act(async () => {
+        vi.advanceTimersByTime(1200);
+      });
+
+      expect(replace).toHaveBeenCalledWith({
+        name: 'result',
+        scores: [{ userId: 1, score: 500 }, { userId: 2, score: 200 }],
+        winnerId: 1,
+        forfeited: false,
+        knockout: true,
+        category: 'umumiy_bilim',
+      });
+      expect(clearGameOver).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('calls reconnectGame when the socket is connected', () => {

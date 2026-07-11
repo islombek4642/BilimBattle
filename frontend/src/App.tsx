@@ -33,6 +33,7 @@ function Router() {
           scores={current.scores}
           winnerId={current.winnerId}
           forfeited={current.forfeited}
+          knockout={current.knockout}
           category={current.category}
         />
       );

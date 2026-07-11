@@ -22,6 +22,7 @@ export interface GameOverPayload {
   scores: ScoreEntry[];
   winnerId: number | null;
   forfeited?: boolean;
+  knockout?: boolean;
 }
 
 export interface OpponentInfo {

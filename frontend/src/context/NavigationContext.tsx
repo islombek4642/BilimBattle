@@ -8,7 +8,7 @@ export type Screen =
   | { name: 'categorySelect'; intent: 'quick' | 'invite' }
   | { name: 'waiting'; category: string; intent: 'quick' | 'invite' | 'joining' }
   | { name: 'battle'; gameId: string; category: string }
-  | { name: 'result'; scores: ScoreEntry[]; winnerId: number | null; forfeited: boolean; category: string }
+  | { name: 'result'; scores: ScoreEntry[]; winnerId: number | null; forfeited: boolean; knockout: boolean; category: string }
   | { name: 'leaderboard' }
   | { name: 'settings' }
   | { name: 'admin' };

@@ -7,6 +7,8 @@ import { CountdownTimer } from '../components/CountdownTimer';
 import { ScoreEntry } from '../api/types';
 import { playSelectFeedback, playCorrectFeedback, playIncorrectFeedback } from '../utils/feedback';
 
+const KO_REVEAL_MS = 1200;
+
 export function BattleScreen({ gameId, category }: { gameId: string; category: string }) {
   const {
     question,
@@ -30,6 +32,7 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
   // question just because the `question_result` event that would normally
   // populate it was missed while offline.
   const [restoredScores, setRestoredScores] = useState<ScoreEntry[]>([]);
+  const [showKnockout, setShowKnockout] = useState(false);
 
   useEffect(() => {
     if (question && question.index !== answeredIndex) {
@@ -37,19 +40,57 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
     }
   }, [question, answeredIndex]);
 
+  // A knockout ending shows a brief "K.O.!" overlay before transitioning -
+  // flip this flag here, but don't navigate/clear state yet; the
+  // delayed-transition effect below owns that once the overlay has had its
+  // moment.
   useEffect(() => {
-    if (gameOver) {
+    if (gameOver?.knockout) {
+      setShowKnockout(true);
+    }
+  }, [gameOver]);
+
+  // Non-knockout endings (the match ran its full course, or a player
+  // forfeited) transition immediately - no overlay, matches the original
+  // behavior exactly.
+  useEffect(() => {
+    if (!gameOver || gameOver.knockout) return;
+    replace({
+      name: 'result',
+      scores: gameOver.scores,
+      winnerId: gameOver.winnerId,
+      forfeited: gameOver.forfeited ?? false,
+      knockout: false,
+      category,
+    });
+    clearGameOver();
+    clearQuestionResult();
+  }, [gameOver, replace, clearGameOver, clearQuestionResult, category]);
+
+  // Knockout endings hold on the "K.O.!" overlay for KO_REVEAL_MS before
+  // transitioning. This MUST be its own effect with these exact
+  // dependencies (not folded into the one above, and not keyed off
+  // `showKnockout` alone) - see WaitingScreen.tsx's VS-reveal effect for the
+  // identical pattern and the production bug it was written to avoid: a
+  // cleanup tied to a dependency that changes more than once fires on every
+  // change, not just on unmount, which would immediately undo the state
+  // transition it's supposed to survive.
+  useEffect(() => {
+    if (!showKnockout || !gameOver) return;
+    const timer = setTimeout(() => {
       replace({
         name: 'result',
         scores: gameOver.scores,
         winnerId: gameOver.winnerId,
         forfeited: gameOver.forfeited ?? false,
+        knockout: true,
         category,
       });
       clearGameOver();
       clearQuestionResult();
-    }
-  }, [gameOver, replace, clearGameOver, clearQuestionResult, category]);
+    }, KO_REVEAL_MS);
+    return () => clearTimeout(timer);
+  }, [showKnockout, gameOver, replace, clearGameOver, clearQuestionResult, category]);
 
   useEffect(() => {
     if (connected) {
@@ -115,6 +156,14 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
     setAnsweredIndex(question.index);
     submitAnswer(gameId, question.index, optionIndex);
   };
+
+  if (showKnockout) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-ios-bg">
+        <span className="animate-ko-reveal text-6xl font-black text-ios-red">K.O.!</span>
+      </div>
+    );
+  }
 
   if (!question) {
     return (
