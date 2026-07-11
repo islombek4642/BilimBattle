@@ -345,5 +345,39 @@ describe('gameEngine full match flow', () => {
       expect(payload.winnerId).toBe(player1Id);
       expect(payload.knockout).toBe(false);
     });
+
+    it('ends the match as a knockout when both players cross HP_MAX in the same round', async () => {
+      // Both players always answer correctly (option 0, matching every mock
+      // question's correctIndex), so both scores climb together at ~200/
+      // round and cross HP_MAX=500 on the same round (round 3). Their exact
+      // scores will likely differ by a few points due to speed-bonus timing
+      // variance between the two submitAnswer calls, so this asserts on the
+      // general shape of the outcome (match ends, knockout reported, a
+      // legitimate winner-or-draw is picked) rather than a hand-computed
+      // exact tie - the point is to lock in that finishGame's existing
+      // higher-score-wins/exact-tie-is-a-draw logic still runs safely when
+      // BOTH players are knocked out in the same round, not to pin down the
+      // exact numbers.
+      jest.spyOn(questionRepository, 'getRandomQuestions').mockResolvedValue(fixedQuestions(3));
+
+      const { fakeIO, events } = createFakeIO();
+      setIOForTesting(fakeIO as any);
+
+      const gameId = randomUUID();
+      await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' });
+
+      for (let i = 0; i < 3; i += 1) {
+        await submitAnswer(gameId, player1Id, 0);
+        await submitAnswer(gameId, player2Id, 0);
+      }
+
+      const gameOverEvent = events.find((e) => e.event === 'game_over');
+      expect(gameOverEvent).toBeDefined();
+      const payload = gameOverEvent!.payload as { winnerId: number | null; knockout: boolean };
+      expect(
+        payload.winnerId === null || payload.winnerId === player1Id || payload.winnerId === player2Id
+      ).toBe(true);
+      expect(payload.knockout).toBe(true);
+    });
   });
 });
