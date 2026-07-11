@@ -125,7 +125,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-shine {
+  .animate-shine,
+  .animate-ko-reveal,
+  .animate-damage-pop,
+  .animate-battle-shake,
+  .animate-star-pop {
     animation: none;
   }
 }
