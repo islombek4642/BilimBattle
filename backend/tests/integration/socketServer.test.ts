@@ -10,6 +10,7 @@ import { redis, closeRedis } from '../../src/config/redis';
 import { upsertUser, getOrCreateBotUser } from '../../src/users/userRepository';
 import { saveGame, deleteGame, GameState } from '../../src/game/gameState';
 import { leaveQueue } from '../../src/matchmaking/queue';
+import { consumeInvite } from '../../src/invite/inviteRoom';
 
 describe('socket server session handling', () => {
   let httpServer: ReturnType<typeof createServer>;
@@ -205,6 +206,47 @@ describe('socket server session handling', () => {
       // same category).
       await leaveQueue(category, user.id);
       await pool.query(`DELETE FROM users WHERE telegram_id = 8801`);
+    }
+  });
+
+  // Regression test: a user opening their own invite link (previewing it,
+  // or accidentally tapping their own "share" link) used to sail straight
+  // through join_invite and get matched against themselves - createMatch
+  // was called with both players resolving to the same userId. The fix
+  // checks socket.data.telegramId against the inviterTelegramId payload
+  // before consuming the invite, so this also asserts the invite survives
+  // the self-join attempt untouched (consumeInvite still finds it).
+  it('refuses to match a user against their own invite, and does not consume it', async () => {
+    const category = 'umumiy_bilim';
+    const telegramId = 8601;
+    const user = await upsertUser(telegramId, 'selfJoin', 'SelfJoin', null);
+    const createMatchSpy = jest.spyOn(matchmaker, 'createMatch');
+
+    const token = signSession({ userId: user.id, telegramId });
+    const client: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token } });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        client.on('connect_error', reject);
+        client.on('connect', () => {
+          client.on('invite_created', () => resolve());
+          client.emit('create_invite', { category });
+        });
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        client.on('invite_expired', () => resolve());
+        client.emit('join_invite', { inviterTelegramId: telegramId, category });
+        setTimeout(() => reject(new Error('timed out waiting for invite_expired')), 2000);
+      });
+
+      expect(createMatchSpy).not.toHaveBeenCalled();
+      const stillPending = await consumeInvite(telegramId);
+      expect(stillPending).not.toBeNull();
+    } finally {
+      client.close();
+      createMatchSpy.mockRestore();
+      await pool.query(`DELETE FROM users WHERE telegram_id = $1`, [telegramId]);
     }
   });
 

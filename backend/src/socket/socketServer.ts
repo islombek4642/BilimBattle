@@ -141,6 +141,16 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
         // above for why.
         if (socket.data.gameId) return;
 
+        // Refuse a self-join: the inviter opening their own invite link
+        // (previewing it, or accidentally tapping their own share) must not
+        // match them against themselves. Checked before consumeInvite so a
+        // stray self-click doesn't burn the invite - it stays valid for an
+        // actual friend to use afterwards.
+        if (socket.data.telegramId === inviterTelegramId) {
+          socket.emit('invite_expired');
+          return;
+        }
+
         const invite = await consumeInvite(inviterTelegramId);
         if (!invite) {
           socket.emit('invite_expired');
