@@ -256,4 +256,110 @@ describe('BattleHeader', () => {
     );
     expect(container.querySelector('.animate-battle-shake')).toBeInTheDocument();
   });
+
+  it('turns the shake off again after the shake duration elapses', () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender, container } = render(
+        <BattleHeader
+          scores={[{ userId: 1, score: 0 }, { userId: 2, score: 0 }]}
+          opponent={{ telegramId: 222, firstName: 'Vali' }}
+          questionIndex={0}
+          totalQuestions={7}
+        />
+      );
+
+      rerender(
+        <BattleHeader
+          scores={[{ userId: 1, score: 300 }, { userId: 2, score: 0 }]}
+          opponent={{ telegramId: 222, firstName: 'Vali' }}
+          questionIndex={1}
+          totalQuestions={7}
+        />
+      );
+      expect(container.querySelector('.animate-battle-shake')).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(150);
+      });
+
+      expect(container.querySelector('.animate-battle-shake')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not stay stuck shaking when a small hit interrupts a pending shake-off timer', () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender, container } = render(
+        <BattleHeader
+          scores={[{ userId: 1, score: 0 }, { userId: 2, score: 0 }]}
+          opponent={{ telegramId: 222, firstName: 'Vali' }}
+          questionIndex={0}
+          totalQuestions={7}
+        />
+      );
+
+      // Big hit: shake starts.
+      rerender(
+        <BattleHeader
+          scores={[{ userId: 1, score: 300 }, { userId: 2, score: 0 }]}
+          opponent={{ telegramId: 222, firstName: 'Vali' }}
+          questionIndex={1}
+          totalQuestions={7}
+        />
+      );
+      expect(container.querySelector('.animate-battle-shake')).toBeInTheDocument();
+
+      // Small hit lands before the shake-off timer fires, interrupting it.
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      rerender(
+        <BattleHeader
+          scores={[{ userId: 1, score: 350 }, { userId: 2, score: 0 }]}
+          opponent={{ telegramId: 222, firstName: 'Vali' }}
+          questionIndex={2}
+          totalQuestions={7}
+        />
+      );
+      expect(container.querySelector('.animate-battle-shake')).not.toBeInTheDocument();
+
+      // A later big hit must still be able to trigger a shake.
+      rerender(
+        <BattleHeader
+          scores={[{ userId: 1, score: 650 }, { userId: 2, score: 0 }]}
+          opponent={{ telegramId: 222, firstName: 'Vali' }}
+          questionIndex={3}
+          totalQuestions={7}
+        />
+      );
+      expect(container.querySelector('.animate-battle-shake')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not shake at exactly the shake threshold (boundary is exclusive)', () => {
+    const { rerender, container } = render(
+      <BattleHeader
+        scores={[{ userId: 1, score: 0 }, { userId: 2, score: 0 }]}
+        opponent={{ telegramId: 222, firstName: 'Vali' }}
+        questionIndex={0}
+        totalQuestions={7}
+      />
+    );
+
+    rerender(
+      <BattleHeader
+        scores={[{ userId: 1, score: 150 }, { userId: 2, score: 0 }]}
+        opponent={{ telegramId: 222, firstName: 'Vali' }}
+        questionIndex={1}
+        totalQuestions={7}
+      />
+    );
+
+    expect(container.querySelector('.animate-battle-shake')).not.toBeInTheDocument();
+  });
 });

@@ -69,6 +69,8 @@ export function BattleHeader({
     if (toOpponent > SHAKE_THRESHOLD || toMe > SHAKE_THRESHOLD) {
       setShaking(true);
       shakeTimer = setTimeout(() => setShaking(false), SHAKE_MS);
+    } else {
+      setShaking(false);
     }
 
     return () => {
