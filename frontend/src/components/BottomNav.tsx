@@ -13,7 +13,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="mx-4 mb-[max(1rem,env(safe-area-inset-bottom))] flex items-center justify-around gap-1 rounded-full bg-ios-card/95 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.1)] backdrop-blur-lg"
+      className="fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-10 flex items-center justify-around gap-1 rounded-full bg-ios-card/95 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.1)] backdrop-blur-lg"
       data-testid="bottom-nav"
     >
       {TABS.map((tab) => {
