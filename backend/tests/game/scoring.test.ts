@@ -31,6 +31,6 @@ describe('calculateScore', () => {
   });
 
   it('rounds a non-half-integer speed bonus to the nearest point', () => {
-    expect(calculateScore(true, 3333)).toBe(BASE_CORRECT_POINTS + 67);
+    expect(calculateScore(true, 3333)).toBe(BASE_CORRECT_POINTS + 89);
   });
 });

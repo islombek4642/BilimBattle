@@ -375,14 +375,14 @@ async function forfeitIfStillDisconnected(gameId: string, userId: number, versio
 
   const opponent = game.players.find((p) => p.userId !== userId)!;
 
-  // RECONNECT_GRACE_MS currently equals QUESTION_TIME_LIMIT_MS, so it's
-  // possible for this timer and the pending question-timeout timer
-  // (activeTimers) to be scheduled for the exact same instant and both fire
-  // in the same tick (this happens in gameEngineDisconnect.test.ts, which
-  // disconnects a player immediately after startGame - i.e. right as the
-  // first question's timer is armed). Clearing whatever question timer is
-  // currently registered for this game prevents a stale next-question timer
-  // from firing after we've already ended the match via forfeit below.
+  // RECONNECT_GRACE_MS and QUESTION_TIME_LIMIT_MS are independent, but a
+  // disconnect can still land close enough to a pending question-timeout
+  // timer (activeTimers) that both end up racing (this happens in
+  // gameEngineDisconnect.test.ts, which disconnects a player immediately
+  // after startGame - i.e. right as the first question's timer is armed).
+  // Clearing whatever question timer is currently registered for this game
+  // prevents a stale next-question timer from firing after we've already
+  // ended the match via forfeit below.
   //
   // There remains the same class of non-atomic read-modify-write race already
   // documented on submitAnswer()/finishGame(): resolveQuestion()'s own

@@ -1,4 +1,4 @@
-export const QUESTION_TIME_LIMIT_MS = 10_000;
+export const QUESTION_TIME_LIMIT_MS = 30_000;
 export const BASE_CORRECT_POINTS = 100;
 export const MAX_SPEED_BONUS = 100;
 

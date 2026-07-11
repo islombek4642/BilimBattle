@@ -2,6 +2,7 @@ import { pool } from '../../src/config/db';
 import { redis, closeRedis } from '../../src/config/redis';
 import { setIOForTesting } from '../../src/socket/socketServer';
 import { startGame, handleDisconnect, handleReconnect } from '../../src/game/gameEngine';
+import { QUESTION_TIME_LIMIT_MS } from '../../src/game/scoring';
 import { upsertUser } from '../../src/users/userRepository';
 import { randomUUID } from 'crypto';
 
@@ -150,13 +151,16 @@ describe('gameEngine disconnect/reconnect handling', () => {
     expect(reconnectedGame).not.toBeNull();
     expect(reconnectedGame?.gameId).toBe(gameId);
 
-    jest.advanceTimersByTime(10_000);
     // No disconnect timer is pending here (handleReconnect cleared it above),
     // but the ordinary question-timeout timer armed by startGame still fires
     // and kicks off its own real getGame/saveGame/emit chain (resolveQuestion
-    // -> sendNextQuestion) for question 0. Wait for that chain to reach its
-    // observable end state (the next 'question' event) so it can't leak into
-    // afterAll's pool.end()/closeRedis() (see waitUntil's comment above).
+    // -> sendNextQuestion) for question 0 - advance by the actual question
+    // time limit (not the unrelated 10s reconnect-grace value used above) so
+    // this keeps working regardless of how the two constants relate to each
+    // other. Wait for that chain to reach its observable end state (the next
+    // 'question' event) so it can't leak into afterAll's pool.end()/
+    // closeRedis() (see waitUntil's comment above).
+    jest.advanceTimersByTime(QUESTION_TIME_LIMIT_MS);
     await waitUntil(() => events.filter((e) => e.event === 'question').length >= 2);
 
     const gameOverEvent = events.find((e) => e.event === 'game_over');
