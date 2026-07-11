@@ -101,8 +101,8 @@ function AppShell() {
   const showBottomNav = ['home', 'leaderboard', 'settings'].includes(current.name);
 
   return (
-    <div className="flex min-h-dvh flex-col justify-between bg-ios-bg">
-      <div className="flex-1">
+    <div className="flex h-dvh flex-col overflow-hidden bg-ios-bg">
+      <div className="flex-1 overflow-y-auto">
         <Router />
       </div>
       {showBottomNav && <BottomNav />}
