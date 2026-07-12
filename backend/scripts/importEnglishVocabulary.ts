@@ -53,6 +53,24 @@ export function pickRandomDistractors(
   return picked;
 }
 
+// Shuffles `arr` in place using Fisher-Yates. Necessary because the source
+// dataset (and therefore the order entries are loaded in) is alphabetically
+// sorted by word - since ids are assigned sequentially at insert time and
+// getRandomQuestions() samples a CONTIGUOUS id window per match (see the
+// query-performance fix), inserting in alphabetical order would mean every
+// match draws 15 alphabetically-adjacent words (e.g. all "necro-"
+// derivatives) instead of a diverse sample. Shuffling here, once, at import
+// time, decouples id order from alphabetical order so a contiguous id
+// window is a genuinely diverse sample again. Also reused by
+// buildQuestionRow below to shuffle each question's options, rather than
+// duplicating the same algorithm inline.
+export function shuffleInPlace<T>(arr: T[], rng: () => number = Math.random): void {
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
 // Builds one 4-option question row for `entry`. `entryIndex` is entry's own
 // position in `pool` (see pickRandomDistractors above for why this is
 // index-based). Uses a Fisher-Yates shuffle tagged with which option is
@@ -74,32 +92,13 @@ export function buildQuestionRow(
     { text: entry.definitions[0], isCorrect: true },
     ...distractors.map((d) => ({ text: d.definitions[0], isCorrect: false })),
   ];
-  for (let i = options.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1));
-    [options[i], options[j]] = [options[j], options[i]];
-  }
+  shuffleInPlace(options, rng);
   return {
     text: entry.term,
     options: options.map((o) => o.text),
     correctIndex: options.findIndex((o) => o.isCorrect),
     extraDefinitions: entry.definitions.slice(1),
   };
-}
-
-// Shuffles `arr` in place using Fisher-Yates. Necessary because the source
-// dataset (and therefore the order entries are loaded in) is alphabetically
-// sorted by word - since ids are assigned sequentially at insert time and
-// getRandomQuestions() samples a CONTIGUOUS id window per match (see the
-// query-performance fix), inserting in alphabetical order would mean every
-// match draws 15 alphabetically-adjacent words (e.g. all "necro-"
-// derivatives) instead of a diverse sample. Shuffling here, once, at import
-// time, decouples id order from alphabetical order so a contiguous id
-// window is a genuinely diverse sample again.
-export function shuffleInPlace<T>(arr: T[], rng: () => number = Math.random): void {
-  for (let i = arr.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
 }
 
 import { promises as fs } from 'fs';

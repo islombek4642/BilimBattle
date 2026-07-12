@@ -90,11 +90,11 @@ describe('buildQuestionRow', () => {
 });
 
 describe('shuffleInPlace', () => {
-  it('reorders the array (not a no-op) for a non-trivial input and a real rng', () => {
+  it('reorders the array (not a no-op) for a non-trivial input and a deterministic rng', () => {
     const arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     const original = [...arr];
-    shuffleInPlace(arr);
-    expect(arr).not.toEqual(original); // astronomically unlikely to coincidentally match with Math.random
+    shuffleInPlace(arr, sequenceRng([0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]));
+    expect(arr).not.toEqual(original);
     expect(arr.length).toBe(original.length);
     expect([...arr].sort((a, b) => a - b)).toEqual(original); // same elements, no loss/duplication
   });
