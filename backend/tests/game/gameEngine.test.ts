@@ -264,7 +264,7 @@ describe('gameEngine full match flow', () => {
     // extraDefinitions so resolveQuestion() definitely resolves it - real
     // seeded umumiy_bilim questions would make which question comes up (and
     // therefore whether extraDefinitions is present) non-deterministic.
-    jest.spyOn(questionRepository, 'getRandomQuestions').mockResolvedValueOnce([
+    const getRandomQuestionsSpy = jest.spyOn(questionRepository, 'getRandomQuestions').mockResolvedValueOnce([
       { id: 999999, text: 'TEST_ENGINE_WithExtra', options: ['a', 'b', 'c', 'd'], correctIndex: 0, extraDefinitions: ['second meaning'] },
     ]);
 
@@ -274,6 +274,8 @@ describe('gameEngine full match flow', () => {
 
     const resultEvent = events.find((e) => e.event === 'question_result');
     expect((resultEvent?.payload as { extraDefinitions?: string[] })?.extraDefinitions).toEqual(['second meaning']);
+
+    getRandomQuestionsSpy.mockRestore();
   });
 
   it('omits extraDefinitions from question_result for a question that has none', async () => {
@@ -281,7 +283,7 @@ describe('gameEngine full match flow', () => {
     const { fakeIO, events } = createFakeIO();
     setIOForTesting(fakeIO as any);
 
-    jest.spyOn(questionRepository, 'getRandomQuestions').mockResolvedValueOnce([
+    const getRandomQuestionsSpy = jest.spyOn(questionRepository, 'getRandomQuestions').mockResolvedValueOnce([
       { id: 999998, text: 'TEST_ENGINE_NoExtra', options: ['a', 'b', 'c', 'd'], correctIndex: 0 },
     ]);
 
@@ -290,7 +292,9 @@ describe('gameEngine full match flow', () => {
     await submitAnswer(gameId, player2Id, 0, 0);
 
     const resultEvent = events.find((e) => e.event === 'question_result');
-    expect((resultEvent?.payload as { extraDefinitions?: string[] })?.extraDefinitions).toBeUndefined();
+    expect(resultEvent?.payload).not.toHaveProperty('extraDefinitions');
+
+    getRandomQuestionsSpy.mockRestore();
   });
 
   describe('HP/knockout mechanic', () => {
