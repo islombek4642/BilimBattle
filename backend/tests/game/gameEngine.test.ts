@@ -255,6 +255,44 @@ describe('gameEngine full match flow', () => {
     errorSpy.mockRestore();
   });
 
+  it('includes extraDefinitions in question_result only when the resolved question has them', async () => {
+    const gameId = randomUUID();
+    const { fakeIO, events } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    // Force getRandomQuestions to return a single fixture question with
+    // extraDefinitions so resolveQuestion() definitely resolves it - real
+    // seeded umumiy_bilim questions would make which question comes up (and
+    // therefore whether extraDefinitions is present) non-deterministic.
+    jest.spyOn(questionRepository, 'getRandomQuestions').mockResolvedValueOnce([
+      { id: 999999, text: 'TEST_ENGINE_WithExtra', options: ['a', 'b', 'c', 'd'], correctIndex: 0, extraDefinitions: ['second meaning'] },
+    ]);
+
+    await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' });
+    await submitAnswer(gameId, player1Id, 0, 0);
+    await submitAnswer(gameId, player2Id, 0, 0);
+
+    const resultEvent = events.find((e) => e.event === 'question_result');
+    expect((resultEvent?.payload as { extraDefinitions?: string[] })?.extraDefinitions).toEqual(['second meaning']);
+  });
+
+  it('omits extraDefinitions from question_result for a question that has none', async () => {
+    const gameId = randomUUID();
+    const { fakeIO, events } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    jest.spyOn(questionRepository, 'getRandomQuestions').mockResolvedValueOnce([
+      { id: 999998, text: 'TEST_ENGINE_NoExtra', options: ['a', 'b', 'c', 'd'], correctIndex: 0 },
+    ]);
+
+    await startGame(gameId, 'umumiy_bilim', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' });
+    await submitAnswer(gameId, player1Id, 0, 0);
+    await submitAnswer(gameId, player2Id, 0, 0);
+
+    const resultEvent = events.find((e) => e.event === 'question_result');
+    expect((resultEvent?.payload as { extraDefinitions?: string[] })?.extraDefinitions).toBeUndefined();
+  });
+
   describe('HP/knockout mechanic', () => {
     function fixedQuestions(count: number) {
       return Array.from({ length: count }, (_, i) => ({

@@ -151,6 +151,7 @@ async function resolveQuestion(gameId: string): Promise<void> {
     index: game.currentQuestionIndex,
     correctIndex: question.correctIndex,
     scores: game.players.map((p) => ({ userId: p.userId, score: p.score })),
+    ...(question.extraDefinitions ? { extraDefinitions: question.extraDefinitions } : {}),
   });
   // Give clients a moment to actually see the correct-answer reveal before
   // the next question replaces it - without this, sendNextQuestion below ran
