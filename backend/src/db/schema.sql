@@ -23,6 +23,11 @@ CREATE TABLE IF NOT EXISTS questions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- The column is declared both inline above (for fresh databases) and via this
+-- ALTER (for databases where the table already existed): migrate.ts re-runs
+-- this whole file every time, and CREATE TABLE IF NOT EXISTS is a no-op when
+-- the table is already present, so it would never pick up the new column on
+-- its own. Follow this same pattern for future column additions.
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS extra_definitions JSONB;
 
 CREATE TABLE IF NOT EXISTS categories (

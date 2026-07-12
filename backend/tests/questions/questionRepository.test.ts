@@ -120,5 +120,17 @@ describe('questionRepository', () => {
       expect(withExtra?.extraDefinitions).toEqual(['second meaning', 'third meaning']);
       expect(noExtra?.extraDefinitions).toBeUndefined();
     });
+
+    it('treats an empty extra_definitions array the same as null (field absent)', async () => {
+      await pool.query(
+        `INSERT INTO questions (category, question_text, options, correct_index, extra_definitions)
+         VALUES ('umumiy_bilim', 'TEST_REPO_EmptyExtra', '["a","b","c","d"]', 0, '[]')`
+      );
+
+      const questions = await getRandomQuestions('umumiy_bilim', 50);
+      const emptyExtra = questions.find((q) => q.text === 'TEST_REPO_EmptyExtra');
+
+      expect(emptyExtra?.extraDefinitions).toBeUndefined();
+    });
   });
 });

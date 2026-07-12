@@ -102,6 +102,8 @@ export async function getRandomQuestions(category: string, count: number): Promi
     text: row.question_text,
     options: row.options,
     correctIndex: row.correct_index,
-    ...(row.extra_definitions ? { extraDefinitions: row.extra_definitions } : {}),
+    ...(row.extra_definitions && row.extra_definitions.length > 0
+      ? { extraDefinitions: row.extra_definitions }
+      : {}),
   }));
 }
