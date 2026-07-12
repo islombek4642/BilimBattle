@@ -86,6 +86,9 @@ export function buildQuestionRow(
   };
 }
 
+import { promises as fs } from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { pool } from '../src/config/db';
 
 const DATASET_URL =
@@ -93,13 +96,23 @@ const DATASET_URL =
 const CATEGORY_KEY = 'ingliz_tili';
 const INSERT_CHUNK_SIZE = 500;
 
+async function assertNotAlreadyImported(): Promise<void> {
+  const existing = await pool.query('SELECT COUNT(*) FROM questions WHERE category = $1', [CATEGORY_KEY]);
+  const count = Number(existing.rows[0].count);
+  if (count > 0) {
+    throw new Error(
+      `${CATEGORY_KEY} already has ${count} questions - refusing to import again and duplicate them. ` +
+        `Delete existing rows first if you really want to re-import (DELETE FROM questions WHERE category = '${CATEGORY_KEY}').`
+    );
+  }
+}
+
 async function downloadParquet(destPath: string): Promise<void> {
   const response = await fetch(DATASET_URL);
   if (!response.ok) {
     throw new Error(`Failed to download dataset: HTTP ${response.status}`);
   }
   const buffer = Buffer.from(await response.arrayBuffer());
-  const fs = await import('fs/promises');
   await fs.writeFile(destPath, buffer);
 }
 
@@ -143,7 +156,11 @@ async function loadVocabEntries(parquetPath: string): Promise<VocabEntry[]> {
   // an empty definitions array would produce a question with no correct
   // answer text or nothing to build a distractor from - skip rather than
   // crash the whole 466k-row import over a handful of bad rows.
-  return rows.filter((r) => r.term && r.definitions?.length > 0);
+  const entries = rows.filter((r) => r.term && r.definitions?.length > 0);
+  if (entries.length < rows.length) {
+    console.log(`Skipped ${rows.length - entries.length} malformed rows (empty term or no definitions)`);
+  }
+  return entries;
 }
 
 async function insertQuestionRows(rows: BuiltQuestionRow[]): Promise<void> {
@@ -166,25 +183,29 @@ async function insertQuestionRows(rows: BuiltQuestionRow[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const os = await import('os');
-  const path = await import('path');
   const parquetPath = path.join(os.tmpdir(), 'english-words-definitions.parquet');
 
-  console.log('Downloading dataset...');
-  await downloadParquet(parquetPath);
+  try {
+    await assertNotAlreadyImported();
 
-  console.log('Parsing dataset...');
-  const entries = await loadVocabEntries(parquetPath);
-  console.log(`Loaded ${entries.length} vocabulary entries`);
+    console.log('Downloading dataset...');
+    await downloadParquet(parquetPath);
 
-  console.log('Building question rows...');
-  const rows = entries.map((entry, index) => buildQuestionRow(entry, index, entries));
+    console.log('Parsing dataset...');
+    const entries = await loadVocabEntries(parquetPath);
+    console.log(`Loaded ${entries.length} vocabulary entries`);
 
-  console.log('Inserting into the database...');
-  await insertQuestionRows(rows);
+    console.log('Building question rows...');
+    const rows = entries.map((entry, index) => buildQuestionRow(entry, index, entries));
 
-  console.log('Done.');
-  await pool.end();
+    console.log('Inserting into the database...');
+    await insertQuestionRows(rows);
+
+    console.log('Done.');
+  } finally {
+    await fs.unlink(parquetPath).catch(() => {});
+    await pool.end();
+  }
 }
 
 if (require.main === module) {
