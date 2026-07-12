@@ -53,6 +53,14 @@ CREATE TABLE IF NOT EXISTS matches (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_questions_category ON questions(category);
 CREATE INDEX IF NOT EXISTS idx_questions_category_id ON questions(category, id);
+-- idx_questions_category (category) is now redundant: the composite
+-- idx_questions_category_id (category, id) already satisfies any query the
+-- single-column index could serve, via the leftmost-prefix rule. Explicitly
+-- DROP it (rather than just deleting its old CREATE INDEX statement) since
+-- schema.sql is re-applied on every deploy via migrate.ts, and already-
+-- migrated databases still have the old index physically present - editing
+-- the CREATE statement alone would never remove it there. Same pattern as
+-- the extra_definitions column's ALTER TABLE ADD COLUMN above.
+DROP INDEX IF EXISTS idx_questions_category;
 CREATE INDEX IF NOT EXISTS idx_users_rating ON users(rating DESC);

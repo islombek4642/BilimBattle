@@ -102,6 +102,11 @@ describe('questionRepository', () => {
     const category = 'test_repo_wraparound';
 
     beforeAll(async () => {
+      // Defensive: if a previous run of this file was killed before its own
+      // afterAll ran (CI timeout, manual interrupt), orphaned rows could
+      // still be here, which would silently break the "returns fewer than
+      // requested" assertion below (it expects exactly 5, not 5+leftover).
+      await pool.query(`DELETE FROM questions WHERE category = $1`, [category]);
       await pool.query(`INSERT INTO categories (key, label) VALUES ($1, 'Test Wraparound') ON CONFLICT (key) DO NOTHING`, [category]);
       // 5 rows is deliberately small enough that SOME random draws will land
       // near the top of the id range and need the wraparound fallback to

@@ -104,6 +104,14 @@ function toQuestionRecord(row: QuestionRow): QuestionRecord {
   };
 }
 
+// Assumes a category's ids are reasonably contiguous within the shared
+// `questions.id` sequence - true today (small categories were seeded before
+// ingliz_tili's later bulk import), but NOT guaranteed in general: if new
+// questions are ever appended to an existing small category via the admin
+// docx-import flow AFTER a large bulk import happened in between, that
+// category's id range would balloon and this function's random draw would
+// become biased toward the newly-appended rows. Not a problem today; worth
+// revisiting if that usage pattern ever happens.
 export async function getRandomQuestions(category: string, count: number): Promise<QuestionRecord[]> {
   const boundsResult = await pool.query<{ min_id: number | null; max_id: number | null }>(
     `SELECT MIN(id) AS min_id, MAX(id) AS max_id FROM questions WHERE category = $1`,
