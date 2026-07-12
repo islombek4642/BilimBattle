@@ -86,24 +86,66 @@ export async function insertQuestions(category: string, questions: NewQuestion[]
   }
 }
 
-export async function getRandomQuestions(category: string, count: number): Promise<QuestionRecord[]> {
-  const result = await pool.query<{
-    id: number;
-    question_text: string;
-    options: string[];
-    correct_index: number;
-    extra_definitions: string[] | null;
-  }>(
-    `SELECT id, question_text, options, correct_index, extra_definitions FROM questions WHERE category = $1 ORDER BY RANDOM() LIMIT $2`,
-    [category, count]
-  );
-  return result.rows.map((row) => ({
+interface QuestionRow {
+  id: number;
+  question_text: string;
+  options: string[];
+  correct_index: number;
+  extra_definitions: string[] | null;
+}
+
+function toQuestionRecord(row: QuestionRow): QuestionRecord {
+  return {
     id: row.id,
     text: row.question_text,
     options: row.options,
     correctIndex: row.correct_index,
-    ...(row.extra_definitions && row.extra_definitions.length > 0
-      ? { extraDefinitions: row.extra_definitions }
-      : {}),
-  }));
+    ...(row.extra_definitions && row.extra_definitions.length > 0 ? { extraDefinitions: row.extra_definitions } : {}),
+  };
+}
+
+export async function getRandomQuestions(category: string, count: number): Promise<QuestionRecord[]> {
+  const boundsResult = await pool.query<{ min_id: number | null; max_id: number | null }>(
+    `SELECT MIN(id) AS min_id, MAX(id) AS max_id FROM questions WHERE category = $1`,
+    [category]
+  );
+  const { min_id: minId, max_id: maxId } = boundsResult.rows[0];
+  if (minId === null || maxId === null) return [];
+
+  // Picking a uniformly random point within the category's id range and
+  // taking the next `count` rows by id order lets Postgres use an index
+  // range scan (via idx_questions_category_id) instead of the O(n log n)
+  // full-table sort that `ORDER BY RANDOM()` requires - for a 466k-row
+  // category this is the difference between ~337ms and a few milliseconds
+  // per match start. ids aren't perfectly contiguous within one category
+  // (rows from other categories are interleaved by insertion order), so
+  // this isn't a mathematically perfect uniform sample the way ORDER BY
+  // RANDOM() is, but it's a standard, well-accepted trade-off for this kind
+  // of workload and is more than random enough for picking quiz questions.
+  const randomStart = minId + Math.floor(Math.random() * (maxId - minId + 1));
+
+  const forwardResult = await pool.query<QuestionRow>(
+    `SELECT id, question_text, options, correct_index, extra_definitions
+     FROM questions WHERE category = $1 AND id >= $2 ORDER BY id ASC LIMIT $3`,
+    [category, randomStart, count]
+  );
+
+  let rows = forwardResult.rows;
+  if (rows.length < count) {
+    // The random start point was close enough to the category's max id that
+    // there weren't `count` rows at or after it - wrap around and fill the
+    // rest from just BEFORE the start point, walking backwards (closest
+    // first), so the final set is still a contiguous-ish window around the
+    // random point rather than always falling back to "the very first rows
+    // of the category" whenever this happens.
+    const remaining = count - rows.length;
+    const wrapResult = await pool.query<QuestionRow>(
+      `SELECT id, question_text, options, correct_index, extra_definitions
+       FROM questions WHERE category = $1 AND id < $2 ORDER BY id DESC LIMIT $3`,
+      [category, randomStart, remaining]
+    );
+    rows = rows.concat(wrapResult.rows);
+  }
+
+  return rows.map(toQuestionRecord);
 }

@@ -54,4 +54,5 @@ CREATE TABLE IF NOT EXISTS matches (
 );
 
 CREATE INDEX IF NOT EXISTS idx_questions_category ON questions(category);
+CREATE INDEX IF NOT EXISTS idx_questions_category_id ON questions(category, id);
 CREATE INDEX IF NOT EXISTS idx_users_rating ON users(rating DESC);

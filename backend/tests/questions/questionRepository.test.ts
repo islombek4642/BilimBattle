@@ -98,6 +98,50 @@ describe('questionRepository', () => {
     });
   });
 
+  describe('getRandomQuestions wraparound behavior', () => {
+    const category = 'test_repo_wraparound';
+
+    beforeAll(async () => {
+      await pool.query(`INSERT INTO categories (key, label) VALUES ($1, 'Test Wraparound') ON CONFLICT (key) DO NOTHING`, [category]);
+      // 5 rows is deliberately small enough that SOME random draws will land
+      // near the top of the id range and need the wraparound fallback to
+      // still return the full requested count.
+      for (let i = 0; i < 5; i += 1) {
+        await pool.query(
+          `INSERT INTO questions (category, question_text, options, correct_index) VALUES ($1, $2, '["a","b","c","d"]', 0)`,
+          [category, `TEST_WRAP_${i}`]
+        );
+      }
+    });
+
+    afterAll(async () => {
+      await pool.query(`DELETE FROM questions WHERE category = $1`, [category]);
+      await pool.query(`DELETE FROM categories WHERE key = $1`, [category]);
+    });
+
+    it('always returns the requested count even when the random start point is near the end of the id range', async () => {
+      // Run many draws - across enough attempts, some WILL land near the
+      // max id and require the wraparound path; this asserts the count
+      // invariant holds regardless of where the random point lands.
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        const questions = await getRandomQuestions(category, 5);
+        expect(questions.length).toBe(5);
+        const ids = questions.map((q) => q.id);
+        expect(new Set(ids).size).toBe(5); // no duplicates even after wraparound
+      }
+    });
+
+    it('returns fewer than requested (not an error) when the category itself has fewer rows than requested', async () => {
+      const questions = await getRandomQuestions(category, 10);
+      expect(questions.length).toBe(5);
+    });
+
+    it('returns an empty array for a category with zero questions', async () => {
+      const questions = await getRandomQuestions('test_repo_empty_category_xyz', 5);
+      expect(questions).toEqual([]);
+    });
+  });
+
   describe('extra_definitions column', () => {
     afterEach(async () => {
       await pool.query(`DELETE FROM questions WHERE question_text LIKE 'TEST_REPO_%'`);
