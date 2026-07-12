@@ -51,6 +51,9 @@ export function buildQuestionRow(
   pool: VocabEntry[],
   rng: () => number = Math.random
 ): BuiltQuestionRow {
+  if (pool[entryIndex] !== entry) {
+    throw new Error(`entryIndex ${entryIndex} does not match the given entry in pool - caller bug`);
+  }
   const distractors = pickRandomDistractors(pool, entryIndex, 3, rng);
   const options = [
     { text: entry.definitions[0], isCorrect: true },

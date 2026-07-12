@@ -80,6 +80,11 @@ describe('buildQuestionRow', () => {
 
   it('never includes the target word itself among the distractor options', () => {
     const row = buildQuestionRow(pool[0], 0, pool, sequenceRng([0, 0.25, 0.5, 0.75]));
-    expect(row.options).not.toContain('Alpha secondary meaning'); // not reused as a "distractor" of itself
+    const occurrences = row.options.filter((o) => o === 'Alpha primary meaning').length;
+    expect(occurrences).toBe(1); // would be 2 if alpha were also picked as its own distractor
+  });
+
+  it('throws if entryIndex does not actually point at entry within pool (caller bug guard)', () => {
+    expect(() => buildQuestionRow(pool[0], 1, pool, sequenceRng([0, 0.25, 0.5, 0.75]))).toThrow();
   });
 });
