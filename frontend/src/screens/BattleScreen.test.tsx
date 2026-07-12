@@ -276,6 +276,32 @@ describe('BattleScreen', () => {
     expect(screen.queryByText("Yana ko'rsatish")).not.toBeInTheDocument();
   });
 
+  it('collapses the "see more definitions" toggle back to its default closed state when the next question arrives', () => {
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Negative', options: ['a', 'b', 'c', 'd'], timeLimitMs: 10000 },
+      questionResult: { index: 0, correctIndex: 0, scores: [], extraDefinitions: ['A pessimistic attitude.', 'An underexposed photo image.'] },
+    });
+    const { rerender } = render(<BattleScreen gameId="g1" category="ingliz_tili" />);
+
+    fireEvent.click(screen.getByText("Yana ko'rsatish"));
+    expect(screen.getByText('A pessimistic attitude.')).toBeInTheDocument();
+
+    // A new question arrives (higher index) with its own fresh questionResult
+    // that ALSO has extraDefinitions - this proves the toggle collapses back
+    // to closed because of the question change itself, not merely because
+    // "this question happens to have no extraDefinitions".
+    mockSocket({
+      question: { index: 1, total: 7, text: 'Optimistic', options: ['e', 'f', 'g', 'h'], timeLimitMs: 10000 },
+      questionResult: { index: 1, correctIndex: 1, scores: [], extraDefinitions: ['Hopeful about the future.'] },
+    });
+    rerender(<BattleScreen gameId="g1" category="ingliz_tili" />);
+
+    expect(screen.queryByText('A pessimistic attitude.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hopeful about the future.')).not.toBeInTheDocument();
+    expect(screen.getByText("Yana ko'rsatish")).toBeInTheDocument();
+    expect(screen.queryByText('Yashirish')).not.toBeInTheDocument();
+  });
+
   it('clears opponent on unmount', () => {
     mockSocket({
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },

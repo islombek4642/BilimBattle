@@ -207,7 +207,8 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
           <button
             type="button"
             onClick={() => setShowExtraDefinitions((prev) => !prev)}
-            className="self-start text-sm font-medium text-ios-blue"
+            aria-expanded={showExtraDefinitions}
+            className="self-start py-2 text-sm font-medium text-ios-blue"
           >
             {showExtraDefinitions ? 'Yashirish' : "Yana ko'rsatish"}
           </button>
