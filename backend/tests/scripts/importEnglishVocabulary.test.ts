@@ -1,4 +1,4 @@
-import { pickRandomDistractors, buildQuestionRow, VocabEntry } from '../../scripts/importEnglishVocabulary';
+import { pickRandomDistractors, buildQuestionRow, shuffleInPlace, VocabEntry } from '../../scripts/importEnglishVocabulary';
 
 // A constant rng (e.g. `() => 0.4`) can never satisfy pickRandomDistractors'
 // while loop once it needs more than one distinct index - it would keep
@@ -86,5 +86,26 @@ describe('buildQuestionRow', () => {
 
   it('throws if entryIndex does not actually point at entry within pool (caller bug guard)', () => {
     expect(() => buildQuestionRow(pool[0], 1, pool, sequenceRng([0, 0.25, 0.5, 0.75]))).toThrow();
+  });
+});
+
+describe('shuffleInPlace', () => {
+  it('reorders the array (not a no-op) for a non-trivial input and a real rng', () => {
+    const arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const original = [...arr];
+    shuffleInPlace(arr);
+    expect(arr).not.toEqual(original); // astronomically unlikely to coincidentally match with Math.random
+    expect(arr.length).toBe(original.length);
+    expect([...arr].sort((a, b) => a - b)).toEqual(original); // same elements, no loss/duplication
+  });
+
+  it('is a no-op-safe operation for an empty or single-element array', () => {
+    const empty: number[] = [];
+    expect(() => shuffleInPlace(empty)).not.toThrow();
+    expect(empty).toEqual([]);
+
+    const single = [42];
+    shuffleInPlace(single);
+    expect(single).toEqual([42]);
   });
 });

@@ -86,6 +86,22 @@ export function buildQuestionRow(
   };
 }
 
+// Shuffles `arr` in place using Fisher-Yates. Necessary because the source
+// dataset (and therefore the order entries are loaded in) is alphabetically
+// sorted by word - since ids are assigned sequentially at insert time and
+// getRandomQuestions() samples a CONTIGUOUS id window per match (see the
+// query-performance fix), inserting in alphabetical order would mean every
+// match draws 15 alphabetically-adjacent words (e.g. all "necro-"
+// derivatives) instead of a diverse sample. Shuffling here, once, at import
+// time, decouples id order from alphabetical order so a contiguous id
+// window is a genuinely diverse sample again.
+export function shuffleInPlace<T>(arr: T[], rng: () => number = Math.random): void {
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
 import { promises as fs } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -194,6 +210,9 @@ async function main(): Promise<void> {
     console.log('Parsing dataset...');
     const entries = await loadVocabEntries(parquetPath);
     console.log(`Loaded ${entries.length} vocabulary entries`);
+
+    console.log('Shuffling entries...');
+    shuffleInPlace(entries);
 
     console.log('Building question rows...');
     const rows = entries.map((entry, index) => buildQuestionRow(entry, index, entries));
