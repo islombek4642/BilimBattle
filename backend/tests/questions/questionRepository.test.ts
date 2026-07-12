@@ -97,4 +97,28 @@ describe('questionRepository', () => {
       expect(stored.rows[0].correct_index).toBe(1);
     });
   });
+
+  describe('extra_definitions column', () => {
+    afterEach(async () => {
+      await pool.query(`DELETE FROM questions WHERE question_text LIKE 'TEST_REPO_%'`);
+    });
+
+    it('returns extraDefinitions when the row has them, and omits the field when null', async () => {
+      await pool.query(
+        `INSERT INTO questions (category, question_text, options, correct_index, extra_definitions)
+         VALUES ('umumiy_bilim', 'TEST_REPO_WithExtra', '["a","b","c","d"]', 0, '["second meaning","third meaning"]')`
+      );
+      await pool.query(
+        `INSERT INTO questions (category, question_text, options, correct_index)
+         VALUES ('umumiy_bilim', 'TEST_REPO_NoExtra', '["a","b","c","d"]', 0)`
+      );
+
+      const questions = await getRandomQuestions('umumiy_bilim', 50);
+      const withExtra = questions.find((q) => q.text === 'TEST_REPO_WithExtra');
+      const noExtra = questions.find((q) => q.text === 'TEST_REPO_NoExtra');
+
+      expect(withExtra?.extraDefinitions).toEqual(['second meaning', 'third meaning']);
+      expect(noExtra?.extraDefinitions).toBeUndefined();
+    });
+  });
 });

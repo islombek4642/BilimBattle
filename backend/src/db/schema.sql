@@ -19,8 +19,11 @@ CREATE TABLE IF NOT EXISTS questions (
   question_text TEXT NOT NULL,
   options JSONB NOT NULL,
   correct_index SMALLINT NOT NULL,
+  extra_definitions JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS extra_definitions JSONB;
 
 CREATE TABLE IF NOT EXISTS categories (
   id SERIAL PRIMARY KEY,
@@ -30,7 +33,8 @@ CREATE TABLE IF NOT EXISTS categories (
 
 INSERT INTO categories (key, label) VALUES
   ('umumiy_bilim', 'Umumiy bilim'),
-  ('sport_kino_musiqa', 'Sport/Kino/Musiqa')
+  ('sport_kino_musiqa', 'Sport/Kino/Musiqa'),
+  ('ingliz_tili', 'Ingliz tili')
 ON CONFLICT (key) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS matches (

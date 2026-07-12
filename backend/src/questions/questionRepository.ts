@@ -7,6 +7,7 @@ export interface QuestionRecord {
   text: string;
   options: string[];
   correctIndex: number;
+  extraDefinitions?: string[];
 }
 
 export interface Category {
@@ -91,8 +92,9 @@ export async function getRandomQuestions(category: string, count: number): Promi
     question_text: string;
     options: string[];
     correct_index: number;
+    extra_definitions: string[] | null;
   }>(
-    `SELECT id, question_text, options, correct_index FROM questions WHERE category = $1 ORDER BY RANDOM() LIMIT $2`,
+    `SELECT id, question_text, options, correct_index, extra_definitions FROM questions WHERE category = $1 ORDER BY RANDOM() LIMIT $2`,
     [category, count]
   );
   return result.rows.map((row) => ({
@@ -100,5 +102,6 @@ export async function getRandomQuestions(category: string, count: number): Promi
     text: row.question_text,
     options: row.options,
     correctIndex: row.correct_index,
+    ...(row.extra_definitions ? { extraDefinitions: row.extra_definitions } : {}),
   }));
 }
