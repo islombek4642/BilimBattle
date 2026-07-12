@@ -13,7 +13,8 @@
     "test": "jest",
     "migrate": "ts-node src/db/migrate.ts",
     "seed": "ts-node src/db/seed.ts",
-    "loadtest": "ts-node scripts/loadTest.ts"
+    "loadtest": "ts-node scripts/loadTest.ts",
+    "import:english-vocab": "ts-node scripts/importEnglishVocabulary.ts"
   },
   "keywords": [],
   "author": "",
@@ -23,6 +24,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "hyparquet": "^1.26.2",
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
     "mammoth": "^1.12.0",
