@@ -16,6 +16,7 @@ export interface QuestionResultPayload {
   index: number;
   correctIndex: number;
   scores: ScoreEntry[];
+  extraDefinitions?: string[];
 }
 
 export interface GameOverPayload {

@@ -6,6 +6,7 @@
 const CATEGORY_LABELS: Record<string, string> = {
   umumiy_bilim: 'Umumiy bilim',
   sport_kino_musiqa: 'Sport/Kino/Musiqa',
+  ingliz_tili: 'Ingliz tili',
 };
 
 export function categoryLabel(key: string): string {

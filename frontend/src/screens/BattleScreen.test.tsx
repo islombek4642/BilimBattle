@@ -253,6 +253,29 @@ describe('BattleScreen', () => {
     expect(screen.getByTestId('tugofwar-blue')).toHaveStyle({ width: '80%' });
   });
 
+  it('shows a "see more definitions" toggle when the resolved question has extraDefinitions', () => {
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Negative', options: ['a', 'b', 'c', 'd'], timeLimitMs: 10000 },
+      questionResult: { index: 0, correctIndex: 0, scores: [], extraDefinitions: ['A pessimistic attitude.', 'An underexposed photo image.'] },
+    });
+    render(<BattleScreen gameId="g1" category="ingliz_tili" />);
+
+    expect(screen.queryByText('A pessimistic attitude.')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Yana ko'rsatish"));
+    expect(screen.getByText('A pessimistic attitude.')).toBeInTheDocument();
+    expect(screen.getByText('An underexposed photo image.')).toBeInTheDocument();
+  });
+
+  it('does not show the "see more definitions" toggle for a category with no extraDefinitions', () => {
+    mockSocket({
+      question: { index: 0, total: 7, text: 'Poytaxt qaysi?', options: ['Toshkent', 'Samarqand'], timeLimitMs: 10000 },
+      questionResult: { index: 0, correctIndex: 0, scores: [] },
+    });
+    render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+
+    expect(screen.queryByText("Yana ko'rsatish")).not.toBeInTheDocument();
+  });
+
   it('clears opponent on unmount', () => {
     mockSocket({
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },

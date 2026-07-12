@@ -26,6 +26,7 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
   const { replace } = useNavigation();
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [answeredIndex, setAnsweredIndex] = useState<number | null>(null);
+  const [showExtraDefinitions, setShowExtraDefinitions] = useState(false);
   // Fallback scores shown until the next `question_result` event arrives.
   // Seeded from the reconnect ack so a player who drops mid-question and
   // reconnects doesn't see a blank/zeroed score bar for the rest of that
@@ -36,6 +37,7 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
   useEffect(() => {
     if (question && question.index !== answeredIndex) {
       setSelectedOption(null);
+      setShowExtraDefinitions(false);
     }
   }, [question, answeredIndex]);
 
@@ -200,6 +202,24 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
           );
         })}
       </div>
+      {questionResult?.index === question.index && questionResult.extraDefinitions && questionResult.extraDefinitions.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setShowExtraDefinitions((prev) => !prev)}
+            className="self-start text-sm font-medium text-ios-blue"
+          >
+            {showExtraDefinitions ? 'Yashirish' : "Yana ko'rsatish"}
+          </button>
+          {showExtraDefinitions && (
+            <ul className="flex flex-col gap-1 text-sm text-ios-secondary-label">
+              {questionResult.extraDefinitions.map((definition, index) => (
+                <li key={index}>{definition}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
