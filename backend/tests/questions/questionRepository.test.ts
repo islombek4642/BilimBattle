@@ -6,6 +6,8 @@ import {
   getCategoryByKey,
   createCategory,
   insertQuestions,
+  getQuestionsForLevel,
+  maxAvailableLevel,
 } from '../../src/questions/questionRepository';
 
 describe('questionRepository', () => {
@@ -144,6 +146,33 @@ describe('questionRepository', () => {
     it('returns an empty array for a category with zero questions', async () => {
       const questions = await getRandomQuestions('test_repo_empty_category_xyz', 5);
       expect(questions).toEqual([]);
+    });
+  });
+
+  describe('getQuestionsForLevel / maxAvailableLevel', () => {
+    it('returns 15 sequential questions for level 1 starting at the category\'s lowest id', async () => {
+      const level1 = await getQuestionsForLevel(1);
+      expect(level1.length).toBe(15);
+    });
+
+    it('returns a DIFFERENT 15-question set for level 2 than for level 1 (no overlap)', async () => {
+      const level1 = await getQuestionsForLevel(1);
+      const level2 = await getQuestionsForLevel(2);
+      const level1Ids = new Set(level1.map((q) => q.id));
+      const overlap = level2.filter((q) => level1Ids.has(q.id));
+      expect(overlap.length).toBe(0);
+    });
+
+    it('returns the exact same 15 questions when called again for the same level (deterministic, unlike getRandomQuestions)', async () => {
+      const first = await getQuestionsForLevel(5);
+      const second = await getQuestionsForLevel(5);
+      expect(first.map((q) => q.id)).toEqual(second.map((q) => q.id));
+    });
+
+    it('maxAvailableLevel reflects the real ingliz_tili question count (floor(count / 15))', async () => {
+      const countResult = await pool.query(`SELECT COUNT(*) FROM questions WHERE category = 'ingliz_tili'`);
+      const expected = Math.floor(Number(countResult.rows[0].count) / 15);
+      expect(await maxAvailableLevel()).toBe(expected);
     });
   });
 

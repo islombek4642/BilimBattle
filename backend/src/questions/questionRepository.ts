@@ -157,3 +157,37 @@ export async function getRandomQuestions(category: string, count: number): Promi
 
   return rows.map(toQuestionRecord);
 }
+
+const LEVEL_CATEGORY_KEY = 'ingliz_tili';
+
+// Independently-defined from levelProgress.ts's exported QUESTIONS_PER_LEVEL
+// (same value, deliberately not imported - importing it would create a
+// dependency from questions/ on game/, the wrong direction; this file has no
+// dependency on game/ today and should stay that way). Named differently on
+// purpose so nobody mistakes them for the same shared constant.
+const LEVEL_QUESTION_COUNT = 15;
+
+// Deterministic (unlike getRandomQuestions' random-id-window): level N always
+// maps to the same 15-question slice, since the level-mode design requires
+// both matched players (and any future replay) to see the identical
+// question set for a given level number. idx_questions_category_id makes
+// this an efficient index range scan, not a full sort - see the design
+// spec's note on OFFSET cost at very high level numbers (not a concern at
+// today's scale).
+export async function getQuestionsForLevel(level: number): Promise<QuestionRecord[]> {
+  const offset = (level - 1) * LEVEL_QUESTION_COUNT;
+  const result = await pool.query<QuestionRow>(
+    `SELECT id, question_text, options, correct_index, extra_definitions
+     FROM questions WHERE category = $1 ORDER BY id ASC OFFSET $2 LIMIT $3`,
+    [LEVEL_CATEGORY_KEY, offset, LEVEL_QUESTION_COUNT]
+  );
+  return result.rows.map(toQuestionRecord);
+}
+
+export async function maxAvailableLevel(): Promise<number> {
+  const result = await pool.query<{ count: string }>(
+    `SELECT COUNT(*) FROM questions WHERE category = $1`,
+    [LEVEL_CATEGORY_KEY]
+  );
+  return Math.floor(Number(result.rows[0].count) / LEVEL_QUESTION_COUNT);
+}
