@@ -9,6 +9,7 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
 COPY scripts ./scripts
+COPY data ./data
 RUN npm run build
 
 # --- Stage 2: Final Runtime ---
@@ -25,6 +26,12 @@ RUN npm ci --omit=dev && npm cache clean --force
 # a flat dist/... - every path below must account for that.
 COPY --from=builder /app/dist ./dist
 COPY src/db/schema.sql ./dist/src/db/schema.sql
+
+# Not TypeScript, so tsc never touches it - copied straight through instead.
+# Lands at dist/data/ to match importEnglishVocabulary.ts's
+# path.join(__dirname, '..', 'data', ...) (that file lives at
+# dist/scripts/ once compiled).
+COPY --from=builder /app/data ./dist/data
 
 # node:20-alpine already ships a non-root "node" user/group (uid/gid 1000)
 # for exactly this purpose - creating a new one with the same id collides

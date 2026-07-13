@@ -110,6 +110,13 @@ const DATASET_URL =
   'https://huggingface.co/api/datasets/MongoDB/english-words-definitions/parquet/default/train/0.parquet';
 const CATEGORY_KEY = 'ingliz_tili';
 const INSERT_CHUNK_SIZE = 500;
+// A copy of the dataset committed alongside this script (see Dockerfile -
+// both the builder and runtime stages copy backend/data/ to dist/data/, so
+// this path resolves the same way whether run via ts-node from source
+// (backend/scripts/../data) or as compiled JS in the container
+// (dist/scripts/../data). Bundling this avoids depending on Hugging Face's
+// CDN being reachable from wherever this script runs at all.
+const BUNDLED_PARQUET_PATH = path.join(__dirname, '..', 'data', 'english-words-definitions.parquet');
 
 async function assertNotAlreadyImported(): Promise<void> {
   const existing = await pool.query('SELECT COUNT(*) FROM questions WHERE category = $1', [CATEGORY_KEY]);
@@ -135,19 +142,32 @@ async function downloadParquet(destPath: string): Promise<void> {
 // CDN/WAF for this specific endpoint (reproduced on a Hetzner VPS: a plain
 // curl from that IP gets an HTTP 400 with "Error from cloudfront" - the
 // origin returned an HTML block page where JSON was expected, while the
-// exact same URL downloads fine from a residential/office network). Rather
-// than fail outright in that situation, allow an operator to download the
-// file from an unblocked network and stage it at this exact path
-// beforehand (e.g. `docker cp english-words-definitions.parquet
-// <container>:/tmp/`) - if it's already there, skip the download entirely.
+// exact same URL downloads fine from a residential/office network). Three
+// sources are tried in order, cheapest/most-reliable first:
+//   1. A file already staged at destPath (e.g. manually `docker cp`'d in).
+//   2. A copy bundled with this repo/image (BUNDLED_PARQUET_PATH) - copied
+//      to destPath rather than used directly, so the `finally` cleanup in
+//      main() (which deletes destPath after the run) never touches the
+//      committed source file.
+//   3. A live download from Hugging Face, as a last resort.
 async function ensureParquetFile(destPath: string): Promise<void> {
   try {
     await fs.access(destPath);
     console.log(`Found an existing file at ${destPath} - skipping download.`);
     return;
   } catch {
-    // Not present - fall through to a normal download.
+    // Not present - fall through.
   }
+
+  try {
+    await fs.access(BUNDLED_PARQUET_PATH);
+    console.log(`Using the bundled dataset at ${BUNDLED_PARQUET_PATH}`);
+    await fs.copyFile(BUNDLED_PARQUET_PATH, destPath);
+    return;
+  } catch {
+    // Not present - fall through.
+  }
+
   console.log('Downloading dataset...');
   await downloadParquet(destPath);
 }
