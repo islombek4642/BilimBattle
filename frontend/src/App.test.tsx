@@ -64,7 +64,7 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(screen.getByText('Aziz')).toBeInTheDocument();
+    expect(screen.getByText("Tezkor o'yin")).toBeInTheDocument();
     expect(screen.getByTestId('bottom-nav')).toBeInTheDocument();
   });
 
@@ -112,7 +112,7 @@ describe('App', () => {
     expect(telegram.readyWebApp).toHaveBeenCalledOnce();
   });
 
-  it('joins an invite and navigates to the joining-waiting screen when start_param matches invite_<id>', () => {
+  it('does not join an invite even when start_param matches invite_<id> (chat-fallback deep-link is disabled)', () => {
     const joinInvite = vi.fn();
     vi.mocked(authContext.useAuth).mockReturnValue({
       token: 'tok', user: { id: 1, firstName: 'Aziz', rating: 1000 } as any, loading: false, error: null,
@@ -133,8 +133,8 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(joinInvite).toHaveBeenCalledWith(555, 'umumiy_bilim');
-    expect(screen.getByText(/Do'stingiz o'yiniga ulanmoqda/)).toBeInTheDocument();
+    expect(joinInvite).not.toHaveBeenCalled();
+    expect(screen.getByText("Tezkor o'yin")).toBeInTheDocument();
   });
 
   it('does not call joinInvite when there is no invite start_param', () => {
@@ -152,7 +152,7 @@ describe('App', () => {
     render(<App />);
 
     expect(joinInvite).not.toHaveBeenCalled();
-    expect(screen.getByText('Aziz')).toBeInTheDocument();
+    expect(screen.getByText("Tezkor o'yin")).toBeInTheDocument();
   });
 
   it('does not join an invite until the socket is connected', () => {

@@ -6,7 +6,7 @@ import { GameSocketProvider, useGameSocketContext } from './context/GameSocketCo
 import { BottomNav } from './components/BottomNav';
 import { PrimaryButton } from './components/PrimaryButton';
 import { HomeScreen } from './screens/HomeScreen';
-import { CategorySelectScreen } from './screens/CategorySelectScreen';
+import { LevelSelectScreen } from './screens/LevelSelectScreen';
 import { WaitingScreen } from './screens/WaitingScreen';
 import { BattleScreen } from './screens/BattleScreen';
 import { ResultScreen } from './screens/ResultScreen';
@@ -21,12 +21,12 @@ function Router() {
   switch (current.name) {
     case 'home':
       return <HomeScreen />;
-    case 'categorySelect':
-      return <CategorySelectScreen intent={current.intent} />;
+    case 'levelSelect':
+      return <LevelSelectScreen intent={current.intent} />;
     case 'waiting':
-      return <WaitingScreen category={current.category} intent={current.intent} />;
+      return <WaitingScreen level={current.level} intent={current.intent} />;
     case 'battle':
-      return <BattleScreen gameId={current.gameId} category={current.category} />;
+      return <BattleScreen gameId={current.gameId} level={current.level} />;
     case 'result':
       return (
         <ResultScreen
@@ -34,7 +34,8 @@ function Router() {
           winnerId={current.winnerId}
           forfeited={current.forfeited}
           knockout={current.knockout}
-          category={current.category}
+          level={current.level}
+          levelStars={current.levelStars}
         />
       );
     case 'leaderboard':
@@ -70,9 +71,12 @@ function AppShell() {
     if (!match) return;
 
     hasHandledInviteRef.current = true;
-    const inviterTelegramId = Number(match[1]);
-    joinInvite(inviterTelegramId, 'umumiy_bilim');
-    reset({ name: 'waiting', category: 'umumiy_bilim', intent: 'joining' });
+    // This chat-fallback deep-link path (see backend/src/bot/telegramBot.ts's
+    // extractStartPayload/buildWebAppUrl) predates level mode and has no way
+    // to carry a level number through a plain `/start invite_123` message -
+    // level invites are joined via the proper `startapp` query-param path
+    // instead (which DOES carry richer state end-to-end), so this fallback
+    // is intentionally a no-op now rather than guessing a default level.
   }, [loading, error, sessionReplaced, connected, joinInvite, reset]);
 
   if (loading) {
