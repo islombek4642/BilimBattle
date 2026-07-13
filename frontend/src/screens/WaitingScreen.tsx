@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useGameSocketContext } from '../context/GameSocketContext';
-import { categoryLabel } from '../utils/category';
 import { buildInviteLink, shareInviteLink } from '../telegram/webApp';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
@@ -12,10 +11,10 @@ import { BattleAvatar } from '../components/BattleAvatar';
 const VS_REVEAL_MS = 1800;
 
 export function WaitingScreen({
-  category,
+  level,
   intent,
 }: {
-  category: string;
+  level: number;
   intent: 'quick' | 'invite' | 'joining';
 }) {
   const { user } = useAuth();
@@ -24,7 +23,7 @@ export function WaitingScreen({
     matchFound,
     opponent,
     clearMatchFound,
-    leaveQueue,
+    leaveLevelQueue,
     inviteCreated,
     clearInviteCreated,
     inviteExpired,
@@ -74,7 +73,7 @@ export function WaitingScreen({
   useEffect(() => {
     if (!showVs || !matchFound) return;
     const timer = setTimeout(() => {
-      replace({ name: 'battle', gameId: matchFound.gameId, category: matchFound.category });
+      replace({ name: 'battle', gameId: matchFound.gameId, level: matchFound.level ?? level });
       clearMatchFound();
     }, VS_REVEAL_MS);
     return () => clearTimeout(timer);
@@ -97,7 +96,7 @@ export function WaitingScreen({
 
   const handleCancel = () => {
     if (intent === 'quick') {
-      leaveQueue(category);
+      leaveLevelQueue(level);
     }
     goBack();
   };
@@ -137,8 +136,8 @@ export function WaitingScreen({
         {intent === 'joining'
           ? "Do'stingiz o'yiniga ulanmoqda..."
           : intent === 'invite'
-            ? `${categoryLabel(category)} bo'yicha taklif havolasi tayyorlanmoqda...`
-            : `${categoryLabel(category)} bo'yicha raqib qidirilmoqda...`}
+            ? `${level}-bosqich bo'yicha taklif havolasi tayyorlanmoqda...`
+            : `${level}-bosqich bo'yicha raqib qidirilmoqda...`}
       </p>
       <p className="text-sm tabular-nums text-ios-secondary-label" data-testid="waiting-elapsed">
         {elapsedSeconds}s

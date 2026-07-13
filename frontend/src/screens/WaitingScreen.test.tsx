@@ -12,7 +12,7 @@ describe('WaitingScreen', () => {
   const navigate = vi.fn();
   const replace = vi.fn();
   const goBack = vi.fn();
-  const leaveQueue = vi.fn();
+  const leaveLevelQueue = vi.fn();
   const clearMatchFound = vi.fn();
   const clearInviteCreated = vi.fn();
   const clearInviteExpired = vi.fn();
@@ -29,7 +29,7 @@ describe('WaitingScreen', () => {
       matchFound: null,
       opponent: null as OpponentInfo | null,
       clearMatchFound,
-      leaveQueue,
+      leaveLevelQueue,
       inviteCreated: false,
       clearInviteCreated,
       inviteExpired: false,
@@ -43,7 +43,7 @@ describe('WaitingScreen', () => {
     navigate.mockClear();
     replace.mockClear();
     goBack.mockClear();
-    leaveQueue.mockClear();
+    leaveLevelQueue.mockClear();
     clearMatchFound.mockClear();
     clearInviteCreated.mockClear();
     clearInviteExpired.mockClear();
@@ -52,7 +52,7 @@ describe('WaitingScreen', () => {
       token: 'tok', user: { id: 1, telegramId: 555, firstName: 'Aziz' } as any, loading: false, error: null,
     });
     vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({
-      current: { name: 'waiting', category: 'umumiy_bilim', intent: 'quick' },
+      current: { name: 'waiting', level: 5, intent: 'quick' },
       navigate, goBack, replace, reset: vi.fn(),
     });
 
@@ -63,11 +63,10 @@ describe('WaitingScreen', () => {
     vi.useRealTimers();
   });
 
-  it('shows a searching message with the category label', () => {
+  it('shows a searching message with the level number', () => {
     mockSocket();
-    render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
-    expect(screen.getByText(/Umumiy bilim/)).toBeInTheDocument();
-    expect(screen.getByText(/raqib qidirilmoqda/)).toBeInTheDocument();
+    render(<WaitingScreen level={5} intent="quick" />);
+    expect(screen.getByText(/5-bosqich bo'yicha raqib qidirilmoqda/)).toBeInTheDocument();
   });
 
   it('shows an invite-specific message (not "searching for opponent") for intent=invite', () => {
@@ -76,10 +75,9 @@ describe('WaitingScreen', () => {
     // even though createInvite() (not joinQueue()) is what actually ran -
     // misleading, since no public matchmaking search is happening here.
     mockSocket();
-    render(<WaitingScreen category="umumiy_bilim" intent="invite" />);
+    render(<WaitingScreen level={5} intent="invite" />);
     expect(screen.queryByText(/raqib qidirilmoqda/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Umumiy bilim/)).toBeInTheDocument();
-    expect(screen.getByText(/taklif havolasi tayyorlanmoqda/)).toBeInTheDocument();
+    expect(screen.getByText(/5-bosqich bo'yicha taklif havolasi tayyorlanmoqda/)).toBeInTheDocument();
   });
 
   it('shows a "VS" reveal with both names when matchFound arrives, then replaces with battle after the reveal delay', () => {
@@ -97,13 +95,13 @@ describe('WaitingScreen', () => {
     // separate and unaffected) but `replace` was never called, leaving both
     // players stuck on the VS screen forever.
     mockSocket();
-    const { rerender } = render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
+    const { rerender } = render(<WaitingScreen level={5} intent="quick" />);
 
     mockSocket({
-      matchFound: { gameId: 'g1', category: 'umumiy_bilim', opponent: { telegramId: 999, firstName: 'Vali' } } as any,
+      matchFound: { gameId: 'g1', level: 5, opponent: { telegramId: 999, firstName: 'Vali' } } as any,
       opponent: { telegramId: 999, firstName: 'Vali' },
     });
-    rerender(<WaitingScreen category="umumiy_bilim" intent="quick" />);
+    rerender(<WaitingScreen level={5} intent="quick" />);
 
     expect(screen.getByText('VS')).toBeInTheDocument();
     expect(screen.getByText('Aziz')).toBeInTheDocument();
@@ -112,13 +110,13 @@ describe('WaitingScreen', () => {
 
     vi.advanceTimersByTime(2000);
 
-    expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1', category: 'umumiy_bilim' });
+    expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1', level: 5 });
     expect(clearMatchFound).toHaveBeenCalledOnce();
   });
 
   it('counts up the elapsed search time once per second while searching', () => {
     mockSocket();
-    render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
+    render(<WaitingScreen level={5} intent="quick" />);
 
     expect(screen.getByTestId('waiting-elapsed')).toHaveTextContent('0s');
 
@@ -129,23 +127,23 @@ describe('WaitingScreen', () => {
     expect(screen.getByTestId('waiting-elapsed')).toHaveTextContent('3s');
   });
 
-  it('calls leaveQueue and goes back when cancelling a quick match', () => {
+  it('calls leaveLevelQueue and goes back when cancelling a quick match', () => {
     mockSocket();
-    render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
+    render(<WaitingScreen level={5} intent="quick" />);
 
     fireEvent.click(screen.getByText('Bekor qilish'));
 
-    expect(leaveQueue).toHaveBeenCalledWith('umumiy_bilim');
+    expect(leaveLevelQueue).toHaveBeenCalledWith(5);
     expect(goBack).toHaveBeenCalledOnce();
   });
 
-  it('does not call leaveQueue when cancelling an invite (no queue was joined)', () => {
+  it('does not call leaveLevelQueue when cancelling an invite (no queue was joined)', () => {
     mockSocket();
-    render(<WaitingScreen category="umumiy_bilim" intent="invite" />);
+    render(<WaitingScreen level={5} intent="invite" />);
 
     fireEvent.click(screen.getByText('Bekor qilish'));
 
-    expect(leaveQueue).not.toHaveBeenCalled();
+    expect(leaveLevelQueue).not.toHaveBeenCalled();
     expect(goBack).toHaveBeenCalledOnce();
   });
 
@@ -153,7 +151,7 @@ describe('WaitingScreen', () => {
     mockSocket({ inviteCreated: true });
     const shareSpy = vi.spyOn(telegram, 'shareInviteLink').mockImplementation(() => {});
 
-    render(<WaitingScreen category="umumiy_bilim" intent="invite" />);
+    render(<WaitingScreen level={5} intent="invite" />);
     fireEvent.click(screen.getByText("Do'stga ulashish"));
 
     expect(shareSpy).toHaveBeenCalledOnce();
@@ -163,34 +161,34 @@ describe('WaitingScreen', () => {
 
   it('does not show a share button for quick-match intent', () => {
     mockSocket();
-    render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
+    render(<WaitingScreen level={5} intent="quick" />);
     expect(screen.queryByText("Do'stga ulashish")).not.toBeInTheDocument();
   });
 
   it('shows a disconnect message when the socket is not connected', () => {
     mockSocket({ connected: false });
-    render(<WaitingScreen category="umumiy_bilim" intent="quick" />);
+    render(<WaitingScreen level={5} intent="quick" />);
     expect(screen.getByText(/Aloqa uzildi/)).toBeInTheDocument();
   });
 
   it('shows a joining-specific message and no share button for intent=joining', () => {
     mockSocket();
-    render(<WaitingScreen category="umumiy_bilim" intent="joining" />);
+    render(<WaitingScreen level={5} intent="joining" />);
     expect(screen.getByText(/Do'stingiz o'yiniga ulanmoqda/)).toBeInTheDocument();
     expect(screen.queryByText("Do'stga ulashish")).not.toBeInTheDocument();
   });
 
-  it('does not call leaveQueue when cancelling a joining attempt', () => {
+  it('does not call leaveLevelQueue when cancelling a joining attempt', () => {
     mockSocket();
-    render(<WaitingScreen category="umumiy_bilim" intent="joining" />);
+    render(<WaitingScreen level={5} intent="joining" />);
     fireEvent.click(screen.getByText('Bekor qilish'));
-    expect(leaveQueue).not.toHaveBeenCalled();
+    expect(leaveLevelQueue).not.toHaveBeenCalled();
     expect(goBack).toHaveBeenCalledOnce();
   });
 
   it('shows an invite-expired message when inviteExpired is true', () => {
     mockSocket({ inviteExpired: true });
-    render(<WaitingScreen category="umumiy_bilim" intent="invite" />);
+    render(<WaitingScreen level={5} intent="invite" />);
     expect(screen.getByText(/Taklif muddati tugadi/)).toBeInTheDocument();
   });
 });

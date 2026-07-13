@@ -50,7 +50,7 @@ describe('WaitingScreen + real useGameSocket integration', () => {
       token: 'tok', user: { id: 1, telegramId: 555, firstName: 'Aziz' } as any, loading: false, error: null,
     });
     vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({
-      current: { name: 'waiting', category: 'umumiy_bilim', intent: 'quick' },
+      current: { name: 'waiting', level: 5, intent: 'quick' },
       navigate: vi.fn(), goBack: vi.fn(), replace, reset: vi.fn(),
     });
   });
@@ -63,13 +63,13 @@ describe('WaitingScreen + real useGameSocket integration', () => {
   it('shows the VS reveal and actually navigates to battle after a real match_found event', () => {
     render(
       <GameSocketProvider>
-        <WaitingScreen category="umumiy_bilim" intent="quick" />
+        <WaitingScreen level={5} intent="quick" />
       </GameSocketProvider>
     );
 
     act(() => {
       fakeSocket.__trigger('match_found', {
-        gameId: 'g1', category: 'umumiy_bilim', opponent: { telegramId: 999, firstName: 'Vali' },
+        gameId: 'g1', level: 5, opponent: { telegramId: 999, firstName: 'Vali' },
       });
     });
 
@@ -80,6 +80,6 @@ describe('WaitingScreen + real useGameSocket integration', () => {
       vi.advanceTimersByTime(2000);
     });
 
-    expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1', category: 'umumiy_bilim' });
+    expect(replace).toHaveBeenCalledWith({ name: 'battle', gameId: 'g1', level: 5 });
   });
 });
