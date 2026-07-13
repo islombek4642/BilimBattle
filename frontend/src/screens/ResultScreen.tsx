@@ -30,17 +30,19 @@ export function ResultScreen({
   winnerId,
   forfeited,
   knockout,
-  category,
+  level,
+  levelStars,
 }: {
   scores: ScoreEntry[];
   winnerId: number | null;
   forfeited: boolean;
   knockout: boolean;
-  category: string;
+  level: number;
+  levelStars?: number;
 }) {
   const { user } = useAuth();
   const { reset } = useNavigation();
-  const { joinQueue } = useGameSocketContext();
+  const { joinLevelQueue } = useGameSocketContext();
   const isWinner = winnerId === user?.id;
   const isDraw = winnerId === null;
 
@@ -56,6 +58,48 @@ export function ResultScreen({
   if (!user) return null;
 
   const myScore = findMyScore(scores, user.id);
+  const isLevelResult = levelStars !== undefined;
+
+  const handlePlayAgain = () => {
+    joinLevelQueue(level);
+    reset({ name: 'waiting', level, intent: 'quick' });
+  };
+
+  if (isLevelResult) {
+    return (
+      <div className="flex min-h-full flex-col justify-center gap-8 p-6">
+        <div className="flex flex-col items-center gap-3 rounded-2xl bg-ios-card px-6 py-10 text-center shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
+          <h2 className="text-2xl font-bold text-ios-label">{level}-bosqich tugadi!</h2>
+          <div className="flex gap-1" data-testid="level-stars">
+            {Array.from({ length: 3 }, (_, i) => (
+              <span
+                key={i}
+                className={`animate-star-pop text-3xl ${i < levelStars ? 'text-ios-gold' : 'text-ios-divider'}`}
+                style={{ animationDelay: `${i * 150}ms` }}
+              >
+                ★
+              </span>
+            ))}
+          </div>
+          <div className="mt-2 flex flex-col items-center">
+            <span className="text-xs font-medium text-ios-secondary-label">Sizning ballingiz</span>
+            <span className="text-4xl font-bold tabular-nums text-ios-label">{myScore}</span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3">
+          <PrimaryButton onClick={handlePlayAgain}>Yana o'ynash</PrimaryButton>
+          <button
+            type="button"
+            onClick={() => reset({ name: 'home' })}
+            className="py-2 text-sm font-medium text-ios-secondary-label"
+          >
+            Bosh sahifa
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const opponentScore = findOpponentScore(scores, user.id);
   const resultText = isDraw ? 'Durrang!' : isWinner ? "G'alaba qozondingiz!" : "Mag'lubiyat";
   // Stars are a "how good was this win" signal - a forfeit win isn't a
@@ -67,11 +111,6 @@ export function ResultScreen({
   const handleShare = () => {
     const botUsername = import.meta.env.VITE_BOT_USERNAME ?? 'bilimbattle_bot';
     shareInviteLink(`https://t.me/${botUsername}`, `BilimBattle'da ${myScore} ball to'pladim!`);
-  };
-
-  const handlePlayAgain = () => {
-    joinQueue(category);
-    reset({ name: 'waiting', category, intent: 'quick' });
   };
 
   const resultColor = isDraw ? 'text-ios-secondary-label' : isWinner ? 'text-ios-green' : 'text-ios-red';

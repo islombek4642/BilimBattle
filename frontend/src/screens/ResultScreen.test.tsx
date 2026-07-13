@@ -10,21 +10,21 @@ import * as feedback from '../utils/feedback';
 
 describe('ResultScreen', () => {
   const reset = vi.fn();
-  const joinQueue = vi.fn();
+  const joinLevelQueue = vi.fn();
 
   beforeEach(() => {
     vi.restoreAllMocks();
     reset.mockClear();
-    joinQueue.mockClear();
+    joinLevelQueue.mockClear();
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
       token: 'tok', user: { id: 1, firstName: 'Aziz' } as any, loading: false, error: null,
     });
     vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({
-      current: { name: 'result', scores: [], winnerId: null, forfeited: false, knockout: false, category: 'umumiy_bilim' },
+      current: { name: 'result', scores: [], winnerId: null, forfeited: false, knockout: false, level: 5 },
       navigate: vi.fn(), goBack: vi.fn(), replace: vi.fn(), reset,
     });
     vi.spyOn(gameSocketContext, 'useGameSocketContext').mockReturnValue({
-      joinQueue,
+      joinLevelQueue,
     } as any);
     vi.spyOn(feedback, 'playResultFeedback').mockImplementation(() => {});
   });
@@ -36,7 +36,7 @@ describe('ResultScreen', () => {
         winnerId={1}
         forfeited={false}
         knockout={false}
-        category="umumiy_bilim"
+        level={5}
       />
     );
 
@@ -51,7 +51,7 @@ describe('ResultScreen', () => {
         winnerId={2}
         forfeited={false}
         knockout={true}
-        category="umumiy_bilim"
+        level={5}
       />
     );
 
@@ -65,7 +65,7 @@ describe('ResultScreen', () => {
         winnerId={null}
         forfeited={false}
         knockout={false}
-        category="umumiy_bilim"
+        level={5}
       />
     );
 
@@ -79,7 +79,7 @@ describe('ResultScreen', () => {
         winnerId={1}
         forfeited
         knockout={false}
-        category="umumiy_bilim"
+        level={5}
       />
     );
 
@@ -87,21 +87,21 @@ describe('ResultScreen', () => {
   });
 
   it('joins the queue and resets navigation to a fresh quick-match search when "Yana o\'ynash" is clicked', () => {
-    render(<ResultScreen scores={[]} winnerId={null} forfeited={false} knockout={false} category="umumiy_bilim" />);
+    render(<ResultScreen scores={[]} winnerId={null} forfeited={false} knockout={false} level={5} />);
 
     fireEvent.click(screen.getByText("Yana o'ynash"));
 
-    expect(joinQueue).toHaveBeenCalledWith('umumiy_bilim');
-    expect(reset).toHaveBeenCalledWith({ name: 'waiting', category: 'umumiy_bilim', intent: 'quick' });
+    expect(joinLevelQueue).toHaveBeenCalledWith(5);
+    expect(reset).toHaveBeenCalledWith({ name: 'waiting', level: 5, intent: 'quick' });
   });
 
   it('resets navigation to home when "Bosh sahifa" is clicked, without joining a queue', () => {
-    render(<ResultScreen scores={[]} winnerId={null} forfeited={false} knockout={false} category="umumiy_bilim" />);
+    render(<ResultScreen scores={[]} winnerId={null} forfeited={false} knockout={false} level={5} />);
 
     fireEvent.click(screen.getByText('Bosh sahifa'));
 
     expect(reset).toHaveBeenCalledWith({ name: 'home' });
-    expect(joinQueue).not.toHaveBeenCalled();
+    expect(joinLevelQueue).not.toHaveBeenCalled();
   });
 
   it('shares the result when "Do\'stga ulashish" is clicked', () => {
@@ -113,7 +113,7 @@ describe('ResultScreen', () => {
         winnerId={1}
         forfeited={false}
         knockout={false}
-        category="umumiy_bilim"
+        level={5}
       />
     );
     fireEvent.click(screen.getByText("Do'stga ulashish"));
@@ -125,21 +125,21 @@ describe('ResultScreen', () => {
 
   it('plays "win" result feedback when the player won', () => {
     render(
-      <ResultScreen scores={[{ userId: 1, score: 550 }]} winnerId={1} forfeited={false} knockout={false} category="umumiy_bilim" />
+      <ResultScreen scores={[{ userId: 1, score: 550 }]} winnerId={1} forfeited={false} knockout={false} level={5} />
     );
     expect(feedback.playResultFeedback).toHaveBeenCalledWith('win');
   });
 
   it('plays "loss" result feedback when the other player won', () => {
     render(
-      <ResultScreen scores={[{ userId: 1, score: 200 }]} winnerId={2} forfeited={false} knockout={false} category="umumiy_bilim" />
+      <ResultScreen scores={[{ userId: 1, score: 200 }]} winnerId={2} forfeited={false} knockout={false} level={5} />
     );
     expect(feedback.playResultFeedback).toHaveBeenCalledWith('loss');
   });
 
   it('plays "draw" result feedback when winnerId is null', () => {
     render(
-      <ResultScreen scores={[{ userId: 1, score: 300 }]} winnerId={null} forfeited={false} knockout={false} category="umumiy_bilim" />
+      <ResultScreen scores={[{ userId: 1, score: 300 }]} winnerId={null} forfeited={false} knockout={false} level={5} />
     );
     expect(feedback.playResultFeedback).toHaveBeenCalledWith('draw');
   });
@@ -151,7 +151,7 @@ describe('ResultScreen', () => {
         winnerId={1}
         forfeited={false}
         knockout={true}
-        category="umumiy_bilim"
+        level={5}
       />
     );
 
@@ -167,7 +167,7 @@ describe('ResultScreen', () => {
         winnerId={1}
         forfeited={false}
         knockout={false}
-        category="umumiy_bilim"
+        level={5}
       />
     );
 
@@ -183,7 +183,7 @@ describe('ResultScreen', () => {
         winnerId={2}
         forfeited={false}
         knockout={true}
-        category="umumiy_bilim"
+        level={5}
       />
     );
     expect(screen.queryByTestId('victory-stars')).not.toBeInTheDocument();
@@ -196,7 +196,7 @@ describe('ResultScreen', () => {
         winnerId={null}
         forfeited={false}
         knockout={false}
-        category="umumiy_bilim"
+        level={5}
       />
     );
     expect(screen.queryByTestId('victory-stars')).not.toBeInTheDocument();
@@ -209,10 +209,55 @@ describe('ResultScreen', () => {
         winnerId={1}
         forfeited
         knockout={false}
-        category="umumiy_bilim"
+        level={5}
       />
     );
     expect(screen.queryByTestId('victory-stars')).not.toBeInTheDocument();
+  });
+
+  it('shows a level-complete message with the correct star count when levelStars is present (level mode)', () => {
+    render(
+      <ResultScreen
+        scores={[{ userId: 1, score: 200 }, { userId: 2, score: 150 }]}
+        winnerId={1}
+        forfeited={false}
+        knockout={false}
+        level={5}
+        levelStars={2}
+      />
+    );
+
+    expect(screen.getByText(/5-bosqich/)).toBeInTheDocument();
+    expect(screen.getByTestId('level-stars')).toBeInTheDocument();
+    const filledStars = screen.getByTestId('level-stars').querySelectorAll('.text-ios-gold');
+    expect(filledStars.length).toBe(2);
+    // The existing HP-margin victory-stars rating must NOT appear alongside
+    // the level-mode star rating - they're different concepts and must
+    // never be shown together.
+    expect(screen.queryByTestId('victory-stars')).not.toBeInTheDocument();
+    expect(screen.queryByText("G'alaba qozondingiz!")).not.toBeInTheDocument();
+  });
+
+  it('does not show the level-complete branch when levelStars is absent (normal battle result)', () => {
+    render(
+      <ResultScreen
+        scores={[{ userId: 1, score: 200 }]}
+        winnerId={1}
+        forfeited={false}
+        knockout={false}
+        level={5}
+      />
+    );
+
+    expect(screen.queryByTestId('level-stars')).not.toBeInTheDocument();
+    expect(screen.getByText("G'alaba qozondingiz!")).toBeInTheDocument();
+  });
+
+  it('joins the level queue (not the old category queue) and resets to waiting when "Yana o\'ynash" is clicked', () => {
+    render(<ResultScreen scores={[]} winnerId={null} forfeited={false} knockout={false} level={5} />);
+    fireEvent.click(screen.getByText("Yana o'ynash"));
+    expect(joinLevelQueue).toHaveBeenCalledWith(5);
+    expect(reset).toHaveBeenCalledWith({ name: 'waiting', level: 5, intent: 'quick' });
   });
 });
 
