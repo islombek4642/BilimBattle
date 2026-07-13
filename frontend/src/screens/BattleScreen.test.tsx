@@ -1,4 +1,4 @@
-// frontend/src/screens/BattleScreen.test.tsx
+﻿// frontend/src/screens/BattleScreen.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { BattleScreen } from './BattleScreen';
@@ -44,7 +44,7 @@ describe('BattleScreen', () => {
     reconnectGame.mockClear().mockResolvedValue({ found: true });
 
     vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({
-      current: { name: 'battle', gameId: 'g1', category: 'umumiy_bilim' },
+      current: { name: 'battle', gameId: 'g1', level: 5 },
       navigate: vi.fn(), goBack: vi.fn(), replace, reset: vi.fn(),
     });
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
@@ -57,7 +57,7 @@ describe('BattleScreen', () => {
 
   it('shows a waiting message when no question has arrived yet', () => {
     mockSocket();
-    render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    render(<BattleScreen gameId="g1" level={5} />);
     expect(screen.getByText(/Keyingi savol kutilmoqda/)).toBeInTheDocument();
   });
 
@@ -65,7 +65,7 @@ describe('BattleScreen', () => {
     mockSocket({
       question: { index: 0, total: 7, text: 'Poytaxt qaysi?', options: ['Toshkent', 'Samarqand'], timeLimitMs: 10000 },
     });
-    render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    render(<BattleScreen gameId="g1" level={5} />);
 
     expect(screen.getByText('Poytaxt qaysi?')).toBeInTheDocument();
     expect(screen.getByText('Toshkent')).toBeInTheDocument();
@@ -84,7 +84,7 @@ describe('BattleScreen', () => {
         timeLimitMs: 10000,
       },
     });
-    render(<BattleScreen gameId="g1" category="ingliz_tili" />);
+    render(<BattleScreen gameId="g1" level={5} />);
 
     expect(screen.getByText('Toshkent').className).toContain('text-base');
     expect(screen.getByText(longDefinition).className).toContain('text-xs');
@@ -94,7 +94,7 @@ describe('BattleScreen', () => {
     mockSocket({
       question: { index: 2, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
     });
-    render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    render(<BattleScreen gameId="g1" level={5} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'A' }));
 
@@ -107,7 +107,7 @@ describe('BattleScreen', () => {
     mockSocket({
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
     });
-    render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    render(<BattleScreen gameId="g1" level={5} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'A' }));
     fireEvent.click(screen.getByRole('button', { name: 'B' }));
@@ -120,7 +120,7 @@ describe('BattleScreen', () => {
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
       questionResult: { index: 0, correctIndex: 1, scores: [] },
     });
-    render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    render(<BattleScreen gameId="g1" level={5} />);
 
     expect(screen.getByRole('button', { name: 'B' })).toHaveClass('bg-ios-green');
   });
@@ -129,11 +129,11 @@ describe('BattleScreen', () => {
     mockSocket({
       gameOver: { scores: [{ userId: 1, score: 400 }], winnerId: 1, forfeited: false },
     });
-    render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    render(<BattleScreen gameId="g1" level={5} />);
 
     await waitFor(() =>
       expect(replace).toHaveBeenCalledWith({
-        name: 'result', scores: [{ userId: 1, score: 400 }], winnerId: 1, forfeited: false, knockout: false, category: 'umumiy_bilim',
+        name: 'result', scores: [{ userId: 1, score: 400 }], winnerId: 1, forfeited: false, knockout: false, level: 5, levelStars: undefined,
       })
     );
     expect(clearGameOver).toHaveBeenCalledOnce();
@@ -150,7 +150,7 @@ describe('BattleScreen', () => {
           knockout: true,
         },
       });
-      render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+      render(<BattleScreen gameId="g1" level={5} />);
 
       expect(screen.getByText('K.O.!')).toBeInTheDocument();
       expect(replace).not.toHaveBeenCalled();
@@ -165,7 +165,8 @@ describe('BattleScreen', () => {
         winnerId: 1,
         forfeited: false,
         knockout: true,
-        category: 'umumiy_bilim',
+        level: 5,
+        levelStars: undefined,
       });
       expect(clearGameOver).toHaveBeenCalledOnce();
     } finally {
@@ -175,7 +176,7 @@ describe('BattleScreen', () => {
 
   it('calls reconnectGame when the socket is connected', () => {
     mockSocket();
-    render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    render(<BattleScreen gameId="g1" level={5} />);
     expect(reconnectGame).toHaveBeenCalledWith('g1');
   });
 
@@ -183,7 +184,7 @@ describe('BattleScreen', () => {
     mockSocket({
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
     });
-    render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    render(<BattleScreen gameId="g1" level={5} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'A' }));
 
@@ -194,7 +195,7 @@ describe('BattleScreen', () => {
     mockSocket({
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
     });
-    const { rerender } = render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    const { rerender } = render(<BattleScreen gameId="g1" level={5} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'A' }));
 
@@ -202,7 +203,7 @@ describe('BattleScreen', () => {
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
       questionResult: { index: 0, correctIndex: 0, scores: [] },
     });
-    rerender(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    rerender(<BattleScreen gameId="g1" level={5} />);
 
     expect(feedback.playCorrectFeedback).toHaveBeenCalledOnce();
     expect(feedback.playIncorrectFeedback).not.toHaveBeenCalled();
@@ -212,7 +213,7 @@ describe('BattleScreen', () => {
     mockSocket({
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
     });
-    const { rerender } = render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    const { rerender } = render(<BattleScreen gameId="g1" level={5} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'A' }));
 
@@ -220,7 +221,7 @@ describe('BattleScreen', () => {
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
       questionResult: { index: 0, correctIndex: 1, scores: [] },
     });
-    rerender(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    rerender(<BattleScreen gameId="g1" level={5} />);
 
     expect(feedback.playIncorrectFeedback).toHaveBeenCalledOnce();
     expect(feedback.playCorrectFeedback).not.toHaveBeenCalled();
@@ -231,7 +232,7 @@ describe('BattleScreen', () => {
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
       opponent: { telegramId: 222, firstName: 'Vali' },
     });
-    render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    render(<BattleScreen gameId="g1" level={5} />);
 
     expect(screen.getByText('Vali')).toBeInTheDocument();
   });
@@ -248,14 +249,14 @@ describe('BattleScreen', () => {
     mockSocket({
       question: { index: 0, total: 7, text: 'Q1?', options: ['A', 'B'], timeLimitMs: 10000 },
     });
-    const { rerender } = render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    const { rerender } = render(<BattleScreen gameId="g1" level={5} />);
 
     // Question 0 resolves with a real, lopsided score.
     mockSocket({
       question: { index: 0, total: 7, text: 'Q1?', options: ['A', 'B'], timeLimitMs: 10000 },
       questionResult: { index: 0, correctIndex: 0, scores: [{ userId: 1, score: 300 }, { userId: 2, score: 0 }] },
     });
-    rerender(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    rerender(<BattleScreen gameId="g1" level={5} />);
     expect(screen.getByTestId('tugofwar-blue')).toHaveStyle({ width: '80%' });
 
     // Question 1 starts - questionResult resets to null (useGameSocket's
@@ -266,7 +267,7 @@ describe('BattleScreen', () => {
       question: { index: 1, total: 7, text: 'Q2?', options: ['A', 'B'], timeLimitMs: 10000 },
       questionResult: null,
     });
-    rerender(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    rerender(<BattleScreen gameId="g1" level={5} />);
 
     expect(screen.getByTestId('tugofwar-blue')).toHaveStyle({ width: '80%' });
   });
@@ -276,7 +277,7 @@ describe('BattleScreen', () => {
       question: { index: 0, total: 7, text: 'Negative', options: ['a', 'b', 'c', 'd'], timeLimitMs: 10000 },
       questionResult: { index: 0, correctIndex: 0, scores: [], extraDefinitions: ['A pessimistic attitude.', 'An underexposed photo image.'] },
     });
-    render(<BattleScreen gameId="g1" category="ingliz_tili" />);
+    render(<BattleScreen gameId="g1" level={5} />);
 
     expect(screen.queryByText('A pessimistic attitude.')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("Yana ko'rsatish"));
@@ -289,7 +290,7 @@ describe('BattleScreen', () => {
       question: { index: 0, total: 7, text: 'Poytaxt qaysi?', options: ['Toshkent', 'Samarqand'], timeLimitMs: 10000 },
       questionResult: { index: 0, correctIndex: 0, scores: [] },
     });
-    render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    render(<BattleScreen gameId="g1" level={5} />);
 
     expect(screen.queryByText("Yana ko'rsatish")).not.toBeInTheDocument();
   });
@@ -299,7 +300,7 @@ describe('BattleScreen', () => {
       question: { index: 0, total: 7, text: 'Negative', options: ['a', 'b', 'c', 'd'], timeLimitMs: 10000 },
       questionResult: { index: 0, correctIndex: 0, scores: [], extraDefinitions: ['A pessimistic attitude.', 'An underexposed photo image.'] },
     });
-    const { rerender } = render(<BattleScreen gameId="g1" category="ingliz_tili" />);
+    const { rerender } = render(<BattleScreen gameId="g1" level={5} />);
 
     fireEvent.click(screen.getByText("Yana ko'rsatish"));
     expect(screen.getByText('A pessimistic attitude.')).toBeInTheDocument();
@@ -312,7 +313,7 @@ describe('BattleScreen', () => {
       question: { index: 1, total: 7, text: 'Optimistic', options: ['e', 'f', 'g', 'h'], timeLimitMs: 10000 },
       questionResult: { index: 1, correctIndex: 1, scores: [], extraDefinitions: ['Hopeful about the future.'] },
     });
-    rerender(<BattleScreen gameId="g1" category="ingliz_tili" />);
+    rerender(<BattleScreen gameId="g1" level={5} />);
 
     expect(screen.queryByText('A pessimistic attitude.')).not.toBeInTheDocument();
     expect(screen.queryByText('Hopeful about the future.')).not.toBeInTheDocument();
@@ -324,7 +325,7 @@ describe('BattleScreen', () => {
     mockSocket({
       question: { index: 0, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },
     });
-    const { unmount } = render(<BattleScreen gameId="g1" category="umumiy_bilim" />);
+    const { unmount } = render(<BattleScreen gameId="g1" level={5} />);
 
     unmount();
 

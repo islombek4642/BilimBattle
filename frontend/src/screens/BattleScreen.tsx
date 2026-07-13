@@ -20,7 +20,7 @@ function optionTextSizeClass(text: string): string {
   return 'text-base';
 }
 
-export function BattleScreen({ gameId, category }: { gameId: string; category: string }) {
+export function BattleScreen({ gameId, level }: { gameId: string; level: number }) {
   const {
     question,
     questionResult,
@@ -62,7 +62,8 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
         winnerId: gameOver.winnerId,
         forfeited: gameOver.forfeited ?? false,
         knockout: false,
-        category,
+        level,
+        levelStars: gameOver.levelStars,
       });
       clearGameOver();
       clearQuestionResult();
@@ -87,13 +88,14 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
         winnerId: gameOver.winnerId,
         forfeited: gameOver.forfeited ?? false,
         knockout: true,
-        category,
+        level,
+        levelStars: gameOver.levelStars,
       });
       clearGameOver();
       clearQuestionResult();
     }, KO_REVEAL_MS);
     return () => clearTimeout(timer);
-  }, [gameOver, replace, clearGameOver, clearQuestionResult, category]);
+  }, [gameOver, replace, clearGameOver, clearQuestionResult, level]);
 
   useEffect(() => {
     if (connected) {
