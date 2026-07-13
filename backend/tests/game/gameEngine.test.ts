@@ -7,6 +7,7 @@ import { upsertUser } from '../../src/users/userRepository';
 import { env } from '../../src/config/env';
 import { randomUUID } from 'crypto';
 import * as questionRepository from '../../src/questions/questionRepository';
+import { getLevelProgressForUser } from '../../src/game/levelProgress';
 
 // See gameEngineDisconnect.test.ts's identical helper for why this specific
 // combination (fake setTimeout/setInterval, real nextTick/setImmediate/
@@ -22,13 +23,27 @@ async function waitUntil(predicate: () => boolean, timeoutMs = 3000): Promise<vo
 
 function createFakeIO() {
   const events: { room: string; event: string; payload: unknown }[] = [];
-  const sockets = new Map<string, { id: string; data: Record<string, unknown> }>();
+  const sockets = new Map<string, { id: string; data: Record<string, unknown>; emit: (event: string, payload: unknown) => void }>();
   const fakeIO = {
     sockets: {
       sockets: {
         get(id: string) {
           if (!sockets.has(id)) {
-            sockets.set(id, { id, data: {} });
+            // `room` here is the individual socket's id (not a shared game
+            // room) - this is what finishGame's level-mode branch uses
+            // (getIO().sockets.sockets.get(player.socketId).emit(...)) to
+            // send each player their OWN game_over payload, distinct from
+            // the `.to(gameId).emit(...)` room broadcast used for non-level
+            // games. Recording both under the same `events` shape (with
+            // `room` distinguishing socketId vs gameId) lets tests tell the
+            // two delivery styles apart.
+            sockets.set(id, {
+              id,
+              data: {},
+              emit(event: string, payload: unknown) {
+                events.push({ room: id, event, payload });
+              },
+            });
           }
           return sockets.get(id);
         },
@@ -487,5 +502,77 @@ describe('gameEngine full match flow', () => {
 
     getQuestionsForLevelSpy.mockRestore();
     await deleteGame(gameId);
+  });
+
+  it('awards independent stars to each player based on their OWN correct-answer count, and persists to level_progress', async () => {
+    const gameId = randomUUID();
+    const { fakeIO } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    // 15 fixture questions, all with correctIndex 0.
+    const fixtureQuestions = Array.from({ length: 15 }, (_, i) => ({
+      id: 900300 + i,
+      text: `LEVEL_TEST_STARS${i}`,
+      options: ['a', 'b', 'c', 'd'],
+      correctIndex: 0,
+    }));
+    const getQuestionsForLevelSpy = jest
+      .spyOn(questionRepository, 'getQuestionsForLevel')
+      .mockResolvedValueOnce(fixtureQuestions);
+
+    await startGame(gameId, 'ingliz_tili', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' }, undefined, 9);
+
+    // player1 answers correctly (index 0) every round -> 15/15 correct -> 3 stars.
+    // player2 answers incorrectly (index 1) every round -> 0/15 correct -> 0 stars.
+    for (let round = 0; round < 15; round += 1) {
+      await submitAnswer(gameId, player1Id, 0, round);
+      await submitAnswer(gameId, player2Id, 1, round);
+    }
+
+    const progress1 = await getLevelProgressForUser(player1Id);
+    const progress2 = await getLevelProgressForUser(player2Id);
+    expect(progress1.find((p) => p.levelNumber === 9)?.stars).toBe(3);
+    expect(progress2.find((p) => p.levelNumber === 9)?.stars).toBe(0);
+
+    getQuestionsForLevelSpy.mockRestore();
+    await pool.query(`DELETE FROM level_progress WHERE level_number = 9 AND user_id IN ($1, $2)`, [player1Id, player2Id]);
+  });
+
+  it("emits a per-socket game_over with each recipient's OWN levelStars for a level-mode game", async () => {
+    const gameId = randomUUID();
+    const { fakeIO, events } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    const fixtureQuestions = Array.from({ length: 15 }, (_, i) => ({
+      id: 900400 + i,
+      text: `LEVEL_TEST_EMIT${i}`,
+      options: ['a', 'b', 'c', 'd'],
+      correctIndex: 0,
+    }));
+    const getQuestionsForLevelSpy = jest
+      .spyOn(questionRepository, 'getQuestionsForLevel')
+      .mockResolvedValueOnce(fixtureQuestions);
+
+    await startGame(gameId, 'ingliz_tili', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' }, undefined, 10);
+
+    for (let round = 0; round < 15; round += 1) {
+      await submitAnswer(gameId, player1Id, 0, round); // always correct
+      await submitAnswer(gameId, player2Id, 1, round); // always wrong
+    }
+
+    // createFakeIO's sockets map is keyed by socketId and auto-vivifies, and
+    // each socket's own `emit` (added specifically to support this) records
+    // into the same `events` array with `room` set to the socketId - so
+    // `game_over` events found here prove per-socket delivery (as opposed to
+    // the single `.to(gameId).emit(...)` room broadcast non-level games use,
+    // which would show up as ONE event with `room` set to the gameId).
+    const gameOverEvents = events.filter((e) => e.event === 'game_over');
+    expect(gameOverEvents.length).toBe(2);
+    expect(gameOverEvents.map((e) => e.room).sort()).toEqual(['sock1', 'sock2']);
+    const stars = gameOverEvents.map((e) => (e.payload as { levelStars?: number }).levelStars);
+    expect(stars.sort()).toEqual([0, 3]); // player2 got 0, player1 got 3 (order may vary)
+
+    getQuestionsForLevelSpy.mockRestore();
+    await pool.query(`DELETE FROM level_progress WHERE level_number = 10 AND user_id IN ($1, $2)`, [player1Id, player2Id]);
   });
 });

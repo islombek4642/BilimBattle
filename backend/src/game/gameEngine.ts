@@ -4,6 +4,7 @@ import { calculateScore, QUESTION_TIME_LIMIT_MS } from './scoring';
 import { getRandomQuestions, getQuestionsForLevel, QuestionRecord } from '../questions/questionRepository';
 import { recordMatchResult } from '../users/userRepository';
 import { env } from '../config/env';
+import { calculateLevelStars, upsertLevelProgress } from './levelProgress';
 
 export interface PlayerInfo {
   userId: number;
@@ -247,12 +248,40 @@ async function finishGame(gameId: string, opts?: { knockout?: boolean }): Promis
   await saveGame(game);
   const [p1, p2] = game.players;
   const winnerId = p1.score === p2.score ? null : p1.score > p2.score ? p1.userId : p2.userId;
+  const scores = game.players.map((p) => ({ userId: p.userId, score: p.score }));
 
-  getIO().to(gameId).emit('game_over', {
-    scores: game.players.map((p) => ({ userId: p.userId, score: p.score })),
-    winnerId,
-    knockout: opts?.knockout ?? false,
-  });
+  if (game.level != null) {
+    const level = game.level;
+    for (const player of game.players) {
+      // A correct answer always scores > 0 (BASE_CORRECT_POINTS alone is
+      // 100, per scoring.ts's calculateScore), while an incorrect answer
+      // always scores exactly 0 - so points > 0 reliably identifies a
+      // correct answer without needing to re-look-up the question's
+      // correctIndex here.
+      const correctCount = player.answers.filter((a) => a && a.points > 0).length;
+      const stars = calculateLevelStars(correctCount);
+      // Bots don't have meaningful "progress" to track - only real users
+      // get a level_progress row.
+      if (!player.isBot) {
+        await upsertLevelProgress(player.userId, level, stars);
+      }
+      const socket = getIO().sockets.sockets.get(player.socketId);
+      if (socket) {
+        socket.emit('game_over', {
+          scores,
+          winnerId,
+          knockout: false,
+          levelStars: stars,
+        });
+      }
+    }
+  } else {
+    getIO().to(gameId).emit('game_over', {
+      scores,
+      winnerId,
+      knockout: opts?.knockout ?? false,
+    });
+  }
 
   await persistMatchResult(gameId, {
     category: game.category,
