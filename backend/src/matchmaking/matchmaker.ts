@@ -4,8 +4,15 @@ import { joinQueue, leaveQueue, popTwoIfAvailable, QueuedPlayer } from './queue'
 import { startGame } from '../game/gameEngine';
 import { isValidCategory } from '../questions/questionRepository';
 import { getOrCreateBotUser, getUserById } from '../users/userRepository';
+import { isLevelUnlockedForUser } from '../game/levelProgress';
 
 const BOT_MATCH_TIMEOUT_MS = 15_000;
+const LEVEL_CATEGORY_KEY = 'ingliz_tili';
+
+function levelQueueCategory(level: number): string {
+  return `level:${level}`;
+}
+
 // Tracks users currently waiting in a queue (joined, not yet paired), keyed
 // by userId, so their bot-fallback timer can be found and cancelled on a
 // real pairing or an explicit leave_queue. handleJoinQueue guards against a
@@ -127,6 +134,59 @@ export async function handleJoinQueue(io: AppServer, socketId: string, userId: n
   waitingTimers.set(userId, timer);
 }
 
+export async function handleJoinLevelQueue(io: AppServer, socketId: string, userId: number, level: number): Promise<void> {
+  // A modified client could emit join_level_queue with an arbitrary level
+  // number, bypassing the progression LevelSelectScreen enforces by only
+  // rendering unlocked levels as clickable - re-check server-side before
+  // ever touching the queue, mirroring handleJoinQueue's isValidCategory
+  // check above.
+  if (!(await isLevelUnlockedForUser(userId, level))) {
+    console.log(`matchmaker: refusing join_level_queue from userId=${userId} - level=${level} is not unlocked for this user`);
+    return;
+  }
+
+  const queueCategory = levelQueueCategory(level);
+
+  if (waitingTimers.has(userId)) {
+    console.log(`matchmaker: ignoring duplicate join_level_queue from userId=${userId} (already waiting) level=${level}`);
+    return;
+  }
+
+  console.log(`matchmaker: join_level_queue received userId=${userId} socketId=${socketId} level=${level}`);
+
+  const pair = await runSerialized(queueCategory, async () => {
+    await joinQueue(queueCategory, { userId, socketId });
+    return popTwoIfAvailable(queueCategory);
+  });
+
+  if (pair) {
+    const [player1, player2] = pair;
+    console.log(`matchmaker: paired userId=${player1.userId} with userId=${player2.userId} level=${level}`);
+    clearWaitingTimer(player1.userId);
+    clearWaitingTimer(player2.userId);
+    await createMatch(io, LEVEL_CATEGORY_KEY, player1, player2, false, level);
+    return;
+  }
+
+  console.log(`matchmaker: no opponent yet for userId=${userId} level=${level} - waiting up to ${BOT_MATCH_TIMEOUT_MS}ms before bot fallback`);
+
+  const timer = setTimeout(() => {
+    waitingTimers.delete(userId);
+    void runSerialized(queueCategory, () => leaveQueue(queueCategory, userId)).then(async (removed) => {
+      if (!removed) {
+        console.log(`matchmaker: bot-fallback timer fired for userId=${userId} but they were already paired/removed - skipping`);
+        return;
+      }
+      console.log(`matchmaker: bot-fallback timeout reached for userId=${userId} level=${level} - matching with a bot`);
+      const bot = await getOrCreateBotUser();
+      await createMatch(io, LEVEL_CATEGORY_KEY, { userId, socketId }, { userId: bot.id, socketId: 'bot' }, true, level);
+    }).catch((err) => {
+      console.error('matchmaker: level bot-fallback match failed', err);
+    });
+  }, BOT_MATCH_TIMEOUT_MS);
+  waitingTimers.set(userId, timer);
+}
+
 // Called from the 'leave_queue' socket event. Also reachable (harmlessly) if
 // a client emits leave_queue after already being matched: by then
 // handleJoinQueue's match branch has already cleared this user's waiting
@@ -154,7 +214,8 @@ export async function createMatch(
   category: string,
   player1: QueuedPlayer,
   player2: QueuedPlayer,
-  player2IsBot = false
+  player2IsBot = false,
+  level?: number
 ): Promise<void> {
   const gameId = randomUUID();
 
@@ -185,6 +246,7 @@ export async function createMatch(
     socket1.emit('match_found', {
       gameId,
       category,
+      ...(level != null ? { level } : {}),
       opponent: {
         telegramId: player2User.telegramId,
         firstName: botDisplayName ?? player2User.firstName,
@@ -197,11 +259,12 @@ export async function createMatch(
     socket2.emit('match_found', {
       gameId,
       category,
+      ...(level != null ? { level } : {}),
       opponent: { telegramId: player1User.telegramId, firstName: player1User.firstName },
     });
   } else if (socket2) {
     console.error(`matchmaker: missing user record for player1 userId=${player1.userId} - skipping match_found emit to player2 (gameId=${gameId})`);
   }
 
-  await startGame(gameId, category, player1, { ...player2, isBot: player2IsBot }, botDisplayName);
+  await startGame(gameId, category, player1, { ...player2, isBot: player2IsBot }, botDisplayName, level);
 }

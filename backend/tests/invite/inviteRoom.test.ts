@@ -30,4 +30,16 @@ describe('inviteRoom', () => {
     expect(nonNullResults).toHaveLength(1);
     expect(nonNullResults[0]).toEqual({ category: 'tarix', socketId: 'sockB', userId: 2 });
   });
+
+  it('stores and consumes an optional level field on a pending invite', async () => {
+    await createInvite(9991, { category: 'ingliz_tili', socketId: 'sockL', userId: 1, level: 12 });
+    const invite = await consumeInvite(9991);
+    expect(invite?.level).toBe(12);
+  });
+
+  it('omits level entirely for a normal (non-level) invite', async () => {
+    await createInvite(9992, { category: 'umumiy_bilim', socketId: 'sockN', userId: 1 });
+    const invite = await consumeInvite(9992);
+    expect(invite?.level).toBeUndefined();
+  });
 });

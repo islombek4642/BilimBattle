@@ -4,6 +4,7 @@ export interface PendingInvite {
   category: string;
   socketId: string;
   userId: number;
+  level?: number;
 }
 
 const INVITE_TTL_SECONDS = 5 * 60;
