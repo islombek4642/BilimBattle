@@ -2,10 +2,11 @@ import { Server, Socket } from 'socket.io';
 import { createServer } from 'http';
 import { verifySession } from '../auth/jwt';
 import { submitAnswer, handleDisconnect, handleReconnect } from '../game/gameEngine';
-import { handleJoinQueue, cancelWaiting, createMatch } from '../matchmaking/matchmaker';
+import { handleJoinQueue, handleJoinLevelQueue, cancelWaiting, createMatch } from '../matchmaking/matchmaker';
 import { createInvite, consumeInvite } from '../invite/inviteRoom';
 import { isValidCategory } from '../questions/questionRepository';
 import { getUserById } from '../users/userRepository';
+import { isLevelUnlockedForUser } from '../game/levelProgress';
 import { env } from '../config/env';
 
 export interface SocketData {
@@ -179,6 +180,82 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
         );
       } catch (err) {
         console.error(`socketServer: failed to join invite from inviterTelegramId ${inviterTelegramId}`, err);
+      }
+    });
+
+    // Level-mode equivalent of join_queue - no isValidCategory check (there's
+    // no user-facing category for level mode; it's always 'ingliz_tili'
+    // internally, see matchmaker.ts's handleJoinLevelQueue), just a basic
+    // sanity check on the level number itself.
+    socket.on('join_level_queue', ({ level }: { level: number }) => {
+      if (!Number.isInteger(level) || level < 1) return;
+      if (socket.data.gameId) {
+        console.log(`socketServer: ignoring join_level_queue from userId=${socket.data.userId} - socket already has an active gameId=${socket.data.gameId}`);
+        return;
+      }
+      handleJoinLevelQueue(io!, socket.id, socket.data.userId, level).catch((err) => {
+        console.error(`socketServer: failed to join level queue for user ${socket.data.userId}`, err);
+      });
+    });
+
+    socket.on('leave_level_queue', ({ level }: { level: number }) => {
+      if (!Number.isInteger(level) || level < 1) return;
+      cancelWaiting(socket.data.userId, `level:${level}`);
+    });
+
+    socket.on('create_level_invite', async ({ level }: { level: number }) => {
+      try {
+        if (!Number.isInteger(level) || level < 1) return;
+        if (socket.data.gameId) return;
+        // Same server-side unlock re-check as join_level_queue (see
+        // matchmaker.ts's handleJoinLevelQueue) - the inviter must have
+        // genuinely unlocked this level themselves before offering it to a
+        // friend. The invitee joining via join_level_invite below is
+        // deliberately NOT re-checked against their own progress - playing
+        // a level a friend invited you to, ahead of your own solo
+        // progression, is intended (see design spec).
+        if (!(await isLevelUnlockedForUser(socket.data.userId, level))) return;
+        const telegramId = socket.data.telegramId;
+        await createInvite(telegramId, { category: 'ingliz_tili', socketId: socket.id, userId: socket.data.userId, level });
+        socket.emit('invite_created');
+      } catch (err) {
+        console.error(`socketServer: failed to create level invite for telegramId ${socket.data.telegramId}`, err);
+      }
+    });
+
+    socket.on('join_level_invite', async ({ inviterTelegramId }: { inviterTelegramId: number }) => {
+      try {
+        if (typeof inviterTelegramId !== 'number' || !Number.isFinite(inviterTelegramId)) return;
+        if (socket.data.gameId) return;
+
+        if (socket.data.telegramId === inviterTelegramId) {
+          socket.emit('invite_expired');
+          return;
+        }
+
+        const invite = await consumeInvite(inviterTelegramId);
+        if (!invite || invite.level == null) {
+          socket.emit('invite_expired');
+          return;
+        }
+
+        const inviterCurrentSocketId = activeSocketsByUser.get(invite.userId);
+        const inviterSocket = inviterCurrentSocketId ? io!.sockets.sockets.get(inviterCurrentSocketId) : undefined;
+        if (inviterSocket?.data.gameId) {
+          socket.emit('invite_expired');
+          return;
+        }
+
+        await createMatch(
+          io!,
+          invite.category,
+          { userId: invite.userId, socketId: inviterSocket?.id ?? invite.socketId },
+          { userId: socket.data.userId, socketId: socket.id },
+          false,
+          invite.level
+        );
+      } catch (err) {
+        console.error(`socketServer: failed to join level invite from inviterTelegramId ${inviterTelegramId}`, err);
       }
     });
 

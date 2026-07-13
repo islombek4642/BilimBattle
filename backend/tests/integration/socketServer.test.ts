@@ -11,6 +11,7 @@ import { upsertUser, getOrCreateBotUser } from '../../src/users/userRepository';
 import { saveGame, deleteGame, GameState } from '../../src/game/gameState';
 import { leaveQueue } from '../../src/matchmaking/queue';
 import { consumeInvite } from '../../src/invite/inviteRoom';
+import { upsertLevelProgress } from '../../src/game/levelProgress';
 
 describe('socket server session handling', () => {
   let httpServer: ReturnType<typeof createServer>;
@@ -327,5 +328,200 @@ describe('socket server session handling', () => {
       await deleteGame(gameId);
       await pool.query(`DELETE FROM users WHERE telegram_id IN (8902, 8903)`);
     }
+  });
+
+  // Level-mode equivalents of the join_queue/create_invite/join_invite
+  // coverage above. gameEngine.startGame is mocked out for these (same
+  // technique matchmaker.test.ts's "handleJoinLevelQueue pairs two players"
+  // test already uses) so this test only exercises matchmaker.ts's pairing
+  // and socketServer.ts's handler wiring, not gameEngine's real per-question
+  // setTimeout chain (30s/question, driven by real Redis/Postgres) - which
+  // would still be pending long after this file's afterAll (pool.end()/
+  // closeRedis()) has run, the same hazard already called out on the
+  // 'ignores a join_queue call from a socket already in an active match'
+  // test above.
+  //
+  // Level 3 (rather than level 1) is used here deliberately: level 1 is
+  // unlocked for every user with zero fixture data, which is exactly why
+  // matchmaker.test.ts's own level-pairing tests already use the SAME real
+  // Redis key ('queue:level:1') - and Jest runs test files in separate
+  // parallel workers against one shared real Redis instance, so two files
+  // both queueing on 'queue:level:1' at the same wall-clock moment could
+  // pair a user from this file with a user from matchmaker.test.ts instead
+  // of with each other. Level 3 needs one extra level_progress fixture row
+  // per user (level 2, stars >= 2) but isn't touched by any other test file,
+  // so 'queue:level:3' is exclusively this test's.
+  describe('level mode socket events', () => {
+    it('join_level_queue pairs two sockets that chose the SAME level, and starts a knockout-free match', async () => {
+      const level = 3;
+      const user1 = await upsertUser(8801001, 'levelSockA', 'LevelSockA', null);
+      const user2 = await upsertUser(8801002, 'levelSockB', 'LevelSockB', null);
+      await upsertLevelProgress(user1.id, 2, 2);
+      await upsertLevelProgress(user2.id, 2, 2);
+      const startGameSpy = jest.spyOn(gameEngine, 'startGame').mockResolvedValueOnce(undefined);
+
+      const token1 = signSession({ userId: user1.id, telegramId: 8801001 });
+      const token2 = signSession({ userId: user2.id, telegramId: 8801002 });
+      const client1: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token: token1 } });
+      const client2: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token: token2 } });
+
+      try {
+        // Both clients' 'connect' handlers (and client1's 'match_found'
+        // handler) must be registered up front, in the same synchronous
+        // tick as client creation above, and only THEN awaited together.
+        // Registering client2's handler after awaiting on client1 (as an
+        // earlier version of this test did) races client2's actual
+        // connection - socket.io-client can connect within that await, so
+        // by the time .on('connect', ...) was attached the event had
+        // already fired and would never fire again, meaning client2 never
+        // emitted join_level_queue at all and client1 would sit in the real
+        // queue until the 15s bot-fallback timer, blowing this test's own
+        // timeout in the process.
+        const matchFound1Promise = new Promise<any>((resolve) => client1.on('match_found', resolve));
+        const client1Connected = new Promise<void>((resolve) => client1.on('connect', () => {
+          client1.emit('join_level_queue', { level });
+          resolve();
+        }));
+        const client2Connected = new Promise<void>((resolve) => client2.on('connect', () => {
+          client2.emit('join_level_queue', { level });
+          resolve();
+        }));
+
+        await Promise.all([client1Connected, client2Connected]);
+        const matchFound1 = await matchFound1Promise;
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        expect(matchFound1.level).toBe(level);
+        expect(matchFound1.opponent.telegramId).toBe(8801002);
+      } finally {
+        client1.close();
+        client2.close();
+        startGameSpy.mockRestore();
+        await pool.query(`DELETE FROM matches WHERE player1_id IN ($1, $2) OR player2_id IN ($1, $2)`, [user1.id, user2.id]);
+        await pool.query(`DELETE FROM level_progress WHERE user_id IN ($1, $2)`, [user1.id, user2.id]);
+        await pool.query(`DELETE FROM users WHERE telegram_id IN (8801001, 8801002)`);
+      }
+    });
+
+    it('leave_level_queue removes a waiting user from the level queue', async () => {
+      const level = 3;
+      const user = await upsertUser(8801003, 'levelSockC', 'LevelSockC', null);
+      await upsertLevelProgress(user.id, 2, 2);
+
+      const token = signSession({ userId: user.id, telegramId: 8801003 });
+      const client: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token } });
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          client.on('connect_error', reject);
+          client.on('connect', () => {
+            client.emit('join_level_queue', { level });
+            resolve();
+          });
+        });
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        expect(await redis.llen(`queue:level:${level}`)).toBe(1);
+
+        client.emit('leave_level_queue', { level });
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        expect(await redis.llen(`queue:level:${level}`)).toBe(0);
+      } finally {
+        client.close();
+        await pool.query(`DELETE FROM level_progress WHERE user_id = $1`, [user.id]);
+        await pool.query(`DELETE FROM users WHERE telegram_id = 8801003`);
+      }
+    });
+
+    it('create_level_invite + join_level_invite pairs the inviter and invitee and starts a level match', async () => {
+      const level = 1; // always unlocked for every user - no level_progress fixture needed
+      const inviterTelegramId = 8801004;
+      const inviter = await upsertUser(inviterTelegramId, 'levelSockD', 'LevelSockD', null);
+      const invitee = await upsertUser(8801005, 'levelSockE', 'LevelSockE', null);
+      const startGameSpy = jest.spyOn(gameEngine, 'startGame').mockResolvedValueOnce(undefined);
+
+      const inviterToken = signSession({ userId: inviter.id, telegramId: inviterTelegramId });
+      const inviteeToken = signSession({ userId: invitee.id, telegramId: 8801005 });
+      const inviterClient: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token: inviterToken } });
+      const inviteeClient: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token: inviteeToken } });
+
+      try {
+        // inviteeClient's 'connect' handler must be registered here, in the
+        // same synchronous tick as inviteeClient's creation above, not
+        // deferred behind the inviter's invite_created round-trip below -
+        // same race as join_level_queue's test above: attaching it later
+        // could miss an already-fired 'connect' event, meaning
+        // join_level_invite is never emitted and both sides hang until this
+        // test's own timeout.
+        const inviteeConnected = new Promise<void>((resolve, reject) => {
+          inviteeClient.on('connect_error', reject);
+          inviteeClient.on('connect', () => resolve());
+        });
+
+        await new Promise<void>((resolve, reject) => {
+          inviterClient.on('connect_error', reject);
+          inviterClient.on('connect', () => {
+            inviterClient.on('invite_created', () => resolve());
+            inviterClient.emit('create_level_invite', { level });
+          });
+        });
+        await inviteeConnected;
+
+        const [inviterMatchFound, inviteeMatchFound] = await Promise.all([
+          new Promise<any>((resolve) => inviterClient.on('match_found', resolve)),
+          new Promise<any>((resolve) => {
+            inviteeClient.on('match_found', resolve);
+            inviteeClient.emit('join_level_invite', { inviterTelegramId });
+          }),
+        ]);
+
+        expect(inviterMatchFound.level).toBe(level);
+        expect(inviterMatchFound.opponent.telegramId).toBe(8801005);
+        expect(inviteeMatchFound.level).toBe(level);
+        expect(inviteeMatchFound.opponent.telegramId).toBe(inviterTelegramId);
+      } finally {
+        inviterClient.close();
+        inviteeClient.close();
+        startGameSpy.mockRestore();
+        await pool.query(`DELETE FROM matches WHERE player1_id IN ($1, $2) OR player2_id IN ($1, $2)`, [inviter.id, invitee.id]);
+        await pool.query(`DELETE FROM users WHERE telegram_id IN ($1, $2)`, [inviterTelegramId, 8801005]);
+      }
+    });
+
+    // Mirrors join_level_queue's server-side unlock re-check: a modified
+    // client could emit create_level_invite with an arbitrary level number,
+    // trying to hand a friend a link to a level the inviter hasn't actually
+    // unlocked themselves. Level 3 requires level 2 to have stars >= 2 (see
+    // isLevelUnlocked); this user has no level_progress rows at all, so
+    // level 3 must be refused.
+    it('create_level_invite refuses to create an invite for a level the inviter has not unlocked', async () => {
+      const level = 3;
+      const telegramId = 8801006;
+      const user = await upsertUser(telegramId, 'levelSockF', 'LevelSockF', null);
+
+      const token = signSession({ userId: user.id, telegramId });
+      const client: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token } });
+
+      try {
+        let inviteCreated = false;
+        client.on('invite_created', () => {
+          inviteCreated = true;
+        });
+        await new Promise<void>((resolve, reject) => {
+          client.on('connect_error', reject);
+          client.on('connect', () => {
+            client.emit('create_level_invite', { level });
+            resolve();
+          });
+        });
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        expect(inviteCreated).toBe(false);
+        const stillPending = await consumeInvite(telegramId);
+        expect(stillPending).toBeNull();
+      } finally {
+        client.close();
+        await pool.query(`DELETE FROM users WHERE telegram_id = $1`, [telegramId]);
+      }
+    });
   });
 });
