@@ -53,6 +53,14 @@ CREATE TABLE IF NOT EXISTS matches (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS level_progress (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  level_number INTEGER NOT NULL,
+  stars SMALLINT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, level_number)
+);
+
 CREATE INDEX IF NOT EXISTS idx_questions_category_id ON questions(category, id);
 -- idx_questions_category (category) is now redundant: the composite
 -- idx_questions_category_id (category, id) already satisfies any query the
