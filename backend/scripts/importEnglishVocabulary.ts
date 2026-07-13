@@ -131,6 +131,27 @@ async function downloadParquet(destPath: string): Promise<void> {
   await fs.writeFile(destPath, buffer);
 }
 
+// Some hosting providers' outbound IP ranges get blocked by Hugging Face's
+// CDN/WAF for this specific endpoint (reproduced on a Hetzner VPS: a plain
+// curl from that IP gets an HTTP 400 with "Error from cloudfront" - the
+// origin returned an HTML block page where JSON was expected, while the
+// exact same URL downloads fine from a residential/office network). Rather
+// than fail outright in that situation, allow an operator to download the
+// file from an unblocked network and stage it at this exact path
+// beforehand (e.g. `docker cp english-words-definitions.parquet
+// <container>:/tmp/`) - if it's already there, skip the download entirely.
+async function ensureParquetFile(destPath: string): Promise<void> {
+  try {
+    await fs.access(destPath);
+    console.log(`Found an existing file at ${destPath} - skipping download.`);
+    return;
+  } catch {
+    // Not present - fall through to a normal download.
+  }
+  console.log('Downloading dataset...');
+  await downloadParquet(destPath);
+}
+
 // hyparquet's package.json exposes Node-only exports (incl. asyncBufferFromFile)
 // via a conditional "exports" map that only resolves under moduleResolution
 // "bundler"/"node16"/"nodenext" - this repo's tsconfig uses the classic "node"
@@ -203,8 +224,7 @@ async function main(): Promise<void> {
   try {
     await assertNotAlreadyImported();
 
-    console.log('Downloading dataset...');
-    await downloadParquet(parquetPath);
+    await ensureParquetFile(parquetPath);
 
     console.log('Parsing dataset...');
     const entries = await loadVocabEntries(parquetPath);
