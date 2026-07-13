@@ -112,17 +112,18 @@ describe('App', () => {
     expect(telegram.readyWebApp).toHaveBeenCalledOnce();
   });
 
-  it('does not join an invite even when start_param matches invite_<id> (chat-fallback deep-link is disabled)', () => {
-    const joinInvite = vi.fn();
+  it('joins the level invite and shows the joining-waiting screen when start_param matches invite_<id>', () => {
+    const joinLevelInvite = vi.fn();
     vi.mocked(authContext.useAuth).mockReturnValue({
       token: 'tok', user: { id: 1, firstName: 'Aziz', rating: 1000 } as any, loading: false, error: null,
     });
     vi.mocked(gameSocketContext.useGameSocketContext).mockReturnValue({
       sessionReplaced: false,
-      joinInvite,
+      joinLevelInvite,
       matchFound: null,
+      opponent: null,
       clearMatchFound: vi.fn(),
-      leaveQueue: vi.fn(),
+      leaveLevelQueue: vi.fn(),
       inviteCreated: false,
       clearInviteCreated: vi.fn(),
       inviteExpired: false,
@@ -133,40 +134,41 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(joinInvite).not.toHaveBeenCalled();
-    expect(screen.getByText("Tezkor o'yin")).toBeInTheDocument();
+    expect(joinLevelInvite).toHaveBeenCalledWith(555);
+    expect(screen.queryByText("Tezkor o'yin")).not.toBeInTheDocument();
+    expect(screen.getByText("Do'stingiz o'yiniga ulanmoqda...")).toBeInTheDocument();
   });
 
-  it('does not call joinInvite when there is no invite start_param', () => {
-    const joinInvite = vi.fn();
+  it('does not call joinLevelInvite when there is no invite start_param', () => {
+    const joinLevelInvite = vi.fn();
     vi.mocked(authContext.useAuth).mockReturnValue({
       token: 'tok', user: { id: 1, firstName: 'Aziz', rating: 1000 } as any, loading: false, error: null,
     });
     vi.mocked(gameSocketContext.useGameSocketContext).mockReturnValue({
       sessionReplaced: false,
-      joinInvite,
+      joinLevelInvite,
       connected: true,
     } as any);
     vi.spyOn(telegram, 'getStartParam').mockReturnValue(undefined);
 
     render(<App />);
 
-    expect(joinInvite).not.toHaveBeenCalled();
+    expect(joinLevelInvite).not.toHaveBeenCalled();
     expect(screen.getByText("Tezkor o'yin")).toBeInTheDocument();
   });
 
   it('does not join an invite until the socket is connected', () => {
-    const joinInvite = vi.fn();
+    const joinLevelInvite = vi.fn();
     vi.mocked(authContext.useAuth).mockReturnValue({
       token: 'tok', user: { id: 1, firstName: 'Aziz', rating: 1000 } as any, loading: false, error: null,
     });
     vi.mocked(gameSocketContext.useGameSocketContext).mockReturnValue({
-      sessionReplaced: false, joinInvite, connected: false,
+      sessionReplaced: false, joinLevelInvite, connected: false,
     } as any);
     vi.spyOn(telegram, 'getStartParam').mockReturnValue('invite_555');
 
     render(<App />);
 
-    expect(joinInvite).not.toHaveBeenCalled();
+    expect(joinLevelInvite).not.toHaveBeenCalled();
   });
 });

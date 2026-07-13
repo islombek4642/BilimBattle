@@ -54,7 +54,7 @@ function Router() {
 function AppShell() {
   const { loading, error } = useAuth();
   const { current, reset } = useNavigation();
-  const { sessionReplaced, joinInvite, connected } = useGameSocketContext();
+  const { sessionReplaced, joinLevelInvite, connected } = useGameSocketContext();
 
   useEffect(() => {
     readyWebApp();
@@ -71,13 +71,18 @@ function AppShell() {
     if (!match) return;
 
     hasHandledInviteRef.current = true;
-    // This chat-fallback deep-link path (see backend/src/bot/telegramBot.ts's
-    // extractStartPayload/buildWebAppUrl) predates level mode and has no way
-    // to carry a level number through a plain `/start invite_123` message -
-    // level invites are joined via the proper `startapp` query-param path
-    // instead (which DOES carry richer state end-to-end), so this fallback
-    // is intentionally a no-op now rather than guessing a default level.
-  }, [loading, error, sessionReplaced, connected, joinInvite, reset]);
+    // Both the native `startapp` launch and the chat-fallback `/start
+    // invite_123` message surface here identically as `invite_<id>`. The
+    // level itself doesn't need to travel through the deep link - the server
+    // looks up the invite record (created earlier by the inviter via
+    // `create_level_invite`) from just the inviter's telegram id to know
+    // which level to match on. So we just join and show the waiting screen;
+    // the real level arrives later via `match_found` (see WaitingScreen's
+    // `replace({ name: 'battle', ... level: matchFound.level ?? level })`).
+    const inviterTelegramId = Number(match[1]);
+    joinLevelInvite(inviterTelegramId);
+    reset({ name: 'waiting', level: 1, intent: 'joining' });
+  }, [loading, error, sessionReplaced, connected, joinLevelInvite, reset]);
 
   if (loading) {
     return (
