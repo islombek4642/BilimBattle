@@ -72,6 +72,24 @@ describe('BattleScreen', () => {
     expect(screen.getByText('Samarqand')).toBeInTheDocument();
   });
 
+  it('shrinks the option text for long dictionary-style definitions, but keeps short answers at normal size', () => {
+    const longDefinition =
+      'Rheological is an adjective relating to rheology, which is the study of the flow of matter, particularly in a liquid state, but also as soft solids or solids under conditions in which they respond with plastic flow rather than deforming elastically.';
+    mockSocket({
+      question: {
+        index: 0,
+        total: 7,
+        text: 'Rheological',
+        options: ['Toshkent', longDefinition],
+        timeLimitMs: 10000,
+      },
+    });
+    render(<BattleScreen gameId="g1" category="ingliz_tili" />);
+
+    expect(screen.getByText('Toshkent').className).toContain('text-base');
+    expect(screen.getByText(longDefinition).className).toContain('text-xs');
+  });
+
   it('submits the selected answer and disables further selection', () => {
     mockSocket({
       question: { index: 2, total: 7, text: 'Q?', options: ['A', 'B'], timeLimitMs: 10000 },

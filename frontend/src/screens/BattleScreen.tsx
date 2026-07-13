@@ -9,6 +9,17 @@ import { playSelectFeedback, playCorrectFeedback, playIncorrectFeedback } from '
 
 const KO_REVEAL_MS = 1200;
 
+// Most categories' answers are a short phrase ("Toshkent"), but Ingliz
+// tili's options are full dictionary definitions - some run past 300
+// characters. A fixed font size that looks right for a one-word answer
+// makes a long definition look like a cramped, unreadable wall of text, so
+// the size adapts to how long the option actually is.
+function optionTextSizeClass(text: string): string {
+  if (text.length > 150) return 'text-xs leading-snug';
+  if (text.length > 60) return 'text-sm leading-snug';
+  return 'text-base';
+}
+
 export function BattleScreen({ gameId, category }: { gameId: string; category: string }) {
   const {
     question,
@@ -197,7 +208,7 @@ export function BattleScreen({ gameId, category }: { gameId: string; category: s
                     : 'bg-ios-card text-ios-label'
               }`}
             >
-              <span className="px-5">{option}</span>
+              <span className={`px-5 ${optionTextSizeClass(option)}`}>{option}</span>
             </button>
           );
         })}
