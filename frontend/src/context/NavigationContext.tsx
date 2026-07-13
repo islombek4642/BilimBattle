@@ -5,10 +5,10 @@ import { ScoreEntry } from '../api/types';
 
 export type Screen =
   | { name: 'home' }
-  | { name: 'categorySelect'; intent: 'quick' | 'invite' }
-  | { name: 'waiting'; category: string; intent: 'quick' | 'invite' | 'joining' }
-  | { name: 'battle'; gameId: string; category: string }
-  | { name: 'result'; scores: ScoreEntry[]; winnerId: number | null; forfeited: boolean; knockout: boolean; category: string }
+  | { name: 'levelSelect'; intent: 'quick' | 'invite' }
+  | { name: 'waiting'; level: number; intent: 'quick' | 'invite' | 'joining' }
+  | { name: 'battle'; gameId: string; level: number }
+  | { name: 'result'; scores: ScoreEntry[]; winnerId: number | null; forfeited: boolean; knockout: boolean; level: number; levelStars?: number }
   | { name: 'leaderboard' }
   | { name: 'settings' }
   | { name: 'admin' };
