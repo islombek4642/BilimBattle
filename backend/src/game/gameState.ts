@@ -29,6 +29,11 @@ export interface GameState {
   // "person" for the whole match (including across a reconnect), never the
   // DB's literal "Bot" name.
   botDisplayName?: string;
+  // Only set for level-mode matches (see matchmaking/matchmaker.ts's
+  // handleJoinLevelQueue). Its presence is what gameEngine.ts's
+  // resolveQuestion() checks to skip the knockout early-ending entirely -
+  // level-mode matches always play through the full question pool.
+  level?: number;
 }
 
 const GAME_TTL_SECONDS = 60 * 30;

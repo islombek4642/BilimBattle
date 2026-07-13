@@ -1,7 +1,7 @@
 import { getIO } from '../socket/socketServer';
 import { getGame, saveGame, deleteGame, GameState } from './gameState';
 import { calculateScore, QUESTION_TIME_LIMIT_MS } from './scoring';
-import { getRandomQuestions, QuestionRecord } from '../questions/questionRepository';
+import { getRandomQuestions, getQuestionsForLevel, QuestionRecord } from '../questions/questionRepository';
 import { recordMatchResult } from '../users/userRepository';
 import { env } from '../config/env';
 
@@ -31,9 +31,10 @@ export async function startGame(
   category: string,
   player1: PlayerInfo,
   player2: PlayerInfo,
-  botDisplayName?: string
+  botDisplayName?: string,
+  level?: number
 ): Promise<void> {
-  const questions = await getRandomQuestions(category, QUESTIONS_PER_GAME);
+  const questions = level != null ? await getQuestionsForLevel(level) : await getRandomQuestions(category, QUESTIONS_PER_GAME);
   const game: GameState = {
     gameId,
     category,
@@ -45,6 +46,7 @@ export async function startGame(
     ],
     status: 'active',
     botDisplayName,
+    ...(level != null ? { level } : {}),
   };
   await saveGame(game);
   await sendNextQuestion(gameId);
@@ -171,10 +173,17 @@ async function resolveQuestion(gameId: string): Promise<void> {
   // round (both answered this question correctly), finishGame's existing
   // winner-determination logic (higher score wins, exact tie = draw)
   // handles it correctly with no extra logic needed here.
-  const anyoneKnockedOut = game.players.some((p) => p.score >= HP_MAX);
-  if (anyoneKnockedOut) {
-    await finishGame(gameId, { knockout: true });
-    return;
+  //
+  // Level-mode games (game.level set) never knock out - the whole point of
+  // the mode is to always play through the full 15-question level and
+  // score stars on the player's own correct-answer count, not to end early
+  // on a relative score swing.
+  if (!game.level) {
+    const anyoneKnockedOut = game.players.some((p) => p.score >= HP_MAX);
+    if (anyoneKnockedOut) {
+      await finishGame(gameId, { knockout: true });
+      return;
+    }
   }
 
   await sendNextQuestion(gameId);

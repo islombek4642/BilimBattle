@@ -2,7 +2,7 @@ import { pool } from '../../src/config/db';
 import { redis, closeRedis } from '../../src/config/redis';
 import { setIOForTesting } from '../../src/socket/socketServer';
 import { startGame, submitAnswer } from '../../src/game/gameEngine';
-import { getGame } from '../../src/game/gameState';
+import { getGame, deleteGame } from '../../src/game/gameState';
 import { upsertUser } from '../../src/users/userRepository';
 import { env } from '../../src/config/env';
 import { randomUUID } from 'crypto';
@@ -421,5 +421,71 @@ describe('gameEngine full match flow', () => {
       ).toBe(true);
       expect(payload.knockout).toBe(true);
     });
+  });
+
+  it('uses getQuestionsForLevel (not getRandomQuestions) and stores level on GameState when startGame is called with a level', async () => {
+    const gameId = randomUUID();
+    const { fakeIO } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    const fixtureQuestions = Array.from({ length: 15 }, (_, i) => ({
+      id: 900000 + i,
+      text: `LEVEL_TEST_Q${i}`,
+      options: ['a', 'b', 'c', 'd'],
+      correctIndex: 0,
+    }));
+    const getQuestionsForLevelSpy = jest
+      .spyOn(questionRepository, 'getQuestionsForLevel')
+      .mockResolvedValueOnce(fixtureQuestions);
+    const getRandomQuestionsSpy = jest.spyOn(questionRepository, 'getRandomQuestions');
+
+    await startGame(gameId, 'ingliz_tili', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' }, undefined, 7);
+
+    expect(getQuestionsForLevelSpy).toHaveBeenCalledWith(7);
+    expect(getRandomQuestionsSpy).not.toHaveBeenCalled();
+
+    const game = await getGame(gameId);
+    expect(game?.level).toBe(7);
+
+    getQuestionsForLevelSpy.mockRestore();
+    getRandomQuestionsSpy.mockRestore();
+    await deleteGame(gameId);
+  });
+
+  it('never ends a level-mode game early via knockout, even if a player\'s score reaches HP_MAX', async () => {
+    const gameId = randomUUID();
+    const { fakeIO, events } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    // 15 fixture questions (matches a real level's pool size) so the match
+    // can only end early via knockout, never via "pool exhausted" - proving
+    // the knockout check specifically is what's being skipped.
+    const fixtureQuestions = Array.from({ length: 15 }, (_, i) => ({
+      id: 900200 + i,
+      text: `LEVEL_TEST_NOKO${i}`,
+      options: ['a', 'b', 'c', 'd'],
+      correctIndex: 0,
+    }));
+    const getQuestionsForLevelSpy = jest
+      .spyOn(questionRepository, 'getQuestionsForLevel')
+      .mockResolvedValueOnce(fixtureQuestions);
+
+    await startGame(gameId, 'ingliz_tili', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' }, undefined, 4);
+
+    // Answer instantly and correctly every round - the fastest possible way
+    // to cross HP_MAX=500 in a normal (non-level) game is well within a
+    // handful of max-speed-bonus correct answers (BASE_CORRECT_POINTS=100 +
+    // up to MAX_SPEED_BONUS=100 per question), so after several rounds
+    // player1's score would trigger a knockout in a non-level game.
+    for (let round = 0; round < 6; round += 1) {
+      await submitAnswer(gameId, player1Id, 0, round);
+      await submitAnswer(gameId, player2Id, 1, round);
+    }
+
+    const gameOverEvents = events.filter((e) => e.event === 'game_over');
+    expect(gameOverEvents.length).toBe(0); // still going after 6/15 rounds - a non-level game would very likely have knocked out by now
+
+    getQuestionsForLevelSpy.mockRestore();
+    await deleteGame(gameId);
   });
 });
