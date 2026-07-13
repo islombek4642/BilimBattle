@@ -24,6 +24,7 @@ export interface GameOverPayload {
   winnerId: number | null;
   forfeited?: boolean;
   knockout?: boolean;
+  levelStars?: number;
 }
 
 export interface OpponentInfo {
@@ -34,6 +35,7 @@ export interface OpponentInfo {
 export interface MatchFoundPayload {
   gameId: string;
   category: string;
+  level?: number;
   opponent: OpponentInfo;
 }
 
@@ -62,9 +64,13 @@ export interface ServerToClientEvents {
 export interface ClientToServerEvents {
   join_queue: (payload: { category: string }) => void;
   leave_queue: (payload: { category: string }) => void;
+  join_level_queue: (payload: { level: number }) => void;
+  leave_level_queue: (payload: { level: number }) => void;
   submit_answer: (payload: { gameId: string; questionIndex: number; selectedOption: number }) => void;
   create_invite: (payload: { category: string }) => void;
   join_invite: (payload: { inviterTelegramId: number; category: string }) => void;
+  create_level_invite: (payload: { level: number }) => void;
+  join_level_invite: (payload: { inviterTelegramId: number }) => void;
   reconnect_game: (payload: { gameId: string }, ack: (response: ReconnectAck) => void) => void;
 }
 
@@ -80,9 +86,13 @@ export interface UseGameSocketResult {
   inviteExpired: boolean;
   joinQueue: (category: string) => void;
   leaveQueue: (category: string) => void;
+  joinLevelQueue: (level: number) => void;
+  leaveLevelQueue: (level: number) => void;
   submitAnswer: (gameId: string, questionIndex: number, selectedOption: number) => void;
   createInvite: (category: string) => void;
   joinInvite: (inviterTelegramId: number, category: string) => void;
+  createLevelInvite: (level: number) => void;
+  joinLevelInvite: (inviterTelegramId: number) => void;
   reconnectGame: (gameId: string) => Promise<ReconnectAck>;
   clearMatchFound: () => void;
   clearOpponent: () => void;
@@ -160,6 +170,14 @@ export function useGameSocket(token: string | null): UseGameSocketResult {
     socketRef.current?.emit('leave_queue', { category });
   }, []);
 
+  const joinLevelQueue = useCallback((level: number) => {
+    socketRef.current?.emit('join_level_queue', { level });
+  }, []);
+
+  const leaveLevelQueue = useCallback((level: number) => {
+    socketRef.current?.emit('leave_level_queue', { level });
+  }, []);
+
   const submitAnswer = useCallback(
     (gameId: string, questionIndex: number, selectedOption: number) => {
       socketRef.current?.emit('submit_answer', { gameId, questionIndex, selectedOption });
@@ -173,6 +191,14 @@ export function useGameSocket(token: string | null): UseGameSocketResult {
 
   const joinInvite = useCallback((inviterTelegramId: number, category: string) => {
     socketRef.current?.emit('join_invite', { inviterTelegramId, category });
+  }, []);
+
+  const createLevelInvite = useCallback((level: number) => {
+    socketRef.current?.emit('create_level_invite', { level });
+  }, []);
+
+  const joinLevelInvite = useCallback((inviterTelegramId: number) => {
+    socketRef.current?.emit('join_level_invite', { inviterTelegramId });
   }, []);
 
   const reconnectGame = useCallback((gameId: string): Promise<ReconnectAck> => {
@@ -213,9 +239,13 @@ export function useGameSocket(token: string | null): UseGameSocketResult {
     inviteExpired,
     joinQueue,
     leaveQueue,
+    joinLevelQueue,
+    leaveLevelQueue,
     submitAnswer,
     createInvite,
     joinInvite,
+    createLevelInvite,
+    joinLevelInvite,
     reconnectGame,
     clearMatchFound,
     clearOpponent,

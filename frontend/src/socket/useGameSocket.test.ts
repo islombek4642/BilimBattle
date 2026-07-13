@@ -133,6 +133,32 @@ describe('useGameSocket', () => {
     });
   });
 
+  it('joinLevelQueue/leaveLevelQueue/createLevelInvite/joinLevelInvite emit the correct events and payloads', () => {
+    const { result } = renderHook(() => useGameSocket('tok'));
+
+    result.current.joinLevelQueue(7);
+    expect(fakeSocket.emit).toHaveBeenCalledWith('join_level_queue', { level: 7 });
+
+    result.current.leaveLevelQueue(7);
+    expect(fakeSocket.emit).toHaveBeenCalledWith('leave_level_queue', { level: 7 });
+
+    result.current.createLevelInvite(7);
+    expect(fakeSocket.emit).toHaveBeenCalledWith('create_level_invite', { level: 7 });
+
+    result.current.joinLevelInvite(999);
+    expect(fakeSocket.emit).toHaveBeenCalledWith('join_level_invite', { inviterTelegramId: 999 });
+  });
+
+  it('includes level in matchFound and levelStars in gameOver when the server sends them', () => {
+    const { result } = renderHook(() => useGameSocket('tok'));
+
+    act(() => fakeSocket.__trigger('match_found', { gameId: 'g1', category: 'ingliz_tili', level: 7, opponent: { telegramId: 1, firstName: 'A' } }));
+    expect(result.current.matchFound?.level).toBe(7);
+
+    act(() => fakeSocket.__trigger('game_over', { scores: [], winnerId: null, levelStars: 2 }));
+    expect(result.current.gameOver?.levelStars).toBe(2);
+  });
+
   it('reconnectGame emits reconnect_game and resolves with the ack payload', async () => {
     const { result } = renderHook(() => useGameSocket('tok'));
 
