@@ -18,7 +18,7 @@ export function WaitingScreen({
   intent: 'quick' | 'invite' | 'joining';
 }) {
   const { user } = useAuth();
-  const { replace, goBack } = useNavigation();
+  const { replace, reset } = useNavigation();
   const {
     matchFound,
     opponent,
@@ -94,11 +94,25 @@ export function WaitingScreen({
     return () => clearInterval(interval);
   }, [showVs]);
 
+  // Uses reset(), not goBack(): this screen is reached two different ways -
+  // via navigate() from LevelSelectScreen (stack has history to pop) AND via
+  // reset() from ResultScreen's "Yana o'ynash" or App.tsx's invite-accept
+  // deep link (stack contains ONLY this screen, so goBack() would be a
+  // no-op and the cancel button would silently do nothing). reset() works
+  // identically regardless of how we got here.
   const handleCancel = () => {
     if (intent === 'quick') {
       leaveLevelQueue(level);
+      reset({ name: 'levelSelect', intent: 'quick' });
+      return;
     }
-    goBack();
+    if (intent === 'invite') {
+      reset({ name: 'levelSelect', intent: 'invite' });
+      return;
+    }
+    // 'joining' (accepted a friend's invite) has no levelSelect state to
+    // return to - it's reached directly from the home screen deep link.
+    reset({ name: 'home' });
   };
 
   const handleShare = () => {

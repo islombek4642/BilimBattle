@@ -11,7 +11,7 @@ import type { OpponentInfo } from '../socket/useGameSocket';
 describe('WaitingScreen', () => {
   const navigate = vi.fn();
   const replace = vi.fn();
-  const goBack = vi.fn();
+  const reset = vi.fn();
   const leaveLevelQueue = vi.fn();
   const clearMatchFound = vi.fn();
   const clearInviteCreated = vi.fn();
@@ -42,7 +42,7 @@ describe('WaitingScreen', () => {
     vi.restoreAllMocks();
     navigate.mockClear();
     replace.mockClear();
-    goBack.mockClear();
+    reset.mockClear();
     leaveLevelQueue.mockClear();
     clearMatchFound.mockClear();
     clearInviteCreated.mockClear();
@@ -53,7 +53,7 @@ describe('WaitingScreen', () => {
     });
     vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({
       current: { name: 'waiting', level: 5, intent: 'quick' },
-      navigate, goBack, replace, reset: vi.fn(),
+      navigate, goBack: vi.fn(), replace, reset,
     });
 
     vi.useFakeTimers();
@@ -127,14 +127,19 @@ describe('WaitingScreen', () => {
     expect(screen.getByTestId('waiting-elapsed')).toHaveTextContent('3s');
   });
 
-  it('calls leaveLevelQueue and goes back when cancelling a quick match', () => {
+  it('calls leaveLevelQueue and resets to levelSelect when cancelling a quick match', () => {
+    // Regression: this MUST use reset(), not goBack() - WaitingScreen is
+    // also reached via ResultScreen's "Yana o'ynash" and App.tsx's
+    // invite-accept deep link, both of which reset() the stack down to just
+    // this screen, so goBack() would silently do nothing there (no history
+    // to pop) and the cancel button would appear completely unresponsive.
     mockSocket();
     render(<WaitingScreen level={5} intent="quick" />);
 
     fireEvent.click(screen.getByText('Bekor qilish'));
 
     expect(leaveLevelQueue).toHaveBeenCalledWith(5);
-    expect(goBack).toHaveBeenCalledOnce();
+    expect(reset).toHaveBeenCalledWith({ name: 'levelSelect', intent: 'quick' });
   });
 
   it('does not call leaveLevelQueue when cancelling an invite (no queue was joined)', () => {
@@ -144,7 +149,7 @@ describe('WaitingScreen', () => {
     fireEvent.click(screen.getByText('Bekor qilish'));
 
     expect(leaveLevelQueue).not.toHaveBeenCalled();
-    expect(goBack).toHaveBeenCalledOnce();
+    expect(reset).toHaveBeenCalledWith({ name: 'levelSelect', intent: 'invite' });
   });
 
   it('shows a share button for invite intent that shares the deep link', () => {
@@ -183,7 +188,7 @@ describe('WaitingScreen', () => {
     render(<WaitingScreen level={5} intent="joining" />);
     fireEvent.click(screen.getByText('Bekor qilish'));
     expect(leaveLevelQueue).not.toHaveBeenCalled();
-    expect(goBack).toHaveBeenCalledOnce();
+    expect(reset).toHaveBeenCalledWith({ name: 'home' });
   });
 
   it('shows an invite-expired message when inviteExpired is true', () => {
