@@ -1,1 +1,2 @@
 *.sh text eol=lf
+backend/data/*.csv text eol=lf
