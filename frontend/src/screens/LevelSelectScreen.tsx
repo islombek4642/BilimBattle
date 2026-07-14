@@ -4,27 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useGameSocketContext } from '../context/GameSocketContext';
 import { getLevelProgress, LevelProgressEntry, LevelTierBoundary } from '../api/levelProgress';
-
-const LEVELS_PER_STAGE = 10;
-const STAGE_UNLOCK_STARS_REQUIRED = 25;
-const LEVEL_UNLOCK_STARS_REQUIRED = 2;
-
-// Mirrors backend/src/game/levelProgress.ts's isLevelUnlocked exactly - kept
-// in sync manually (no shared package between frontend/backend in this
-// project).
-function isLevelUnlocked(level: number, progressByLevel: Map<number, number>): boolean {
-  if (level === 1) return true;
-  const isFirstOfStage = (level - 1) % LEVELS_PER_STAGE === 0;
-  if (isFirstOfStage) {
-    const stageStart = level - LEVELS_PER_STAGE;
-    let totalStars = 0;
-    for (let i = stageStart; i < level; i += 1) {
-      totalStars += progressByLevel.get(i) ?? 0;
-    }
-    return totalStars >= STAGE_UNLOCK_STARS_REQUIRED;
-  }
-  return (progressByLevel.get(level - 1) ?? 0) >= LEVEL_UNLOCK_STARS_REQUIRED;
-}
+import { isLevelUnlocked, LEVELS_PER_STAGE } from '../utils/levelUnlock';
 
 // Linear scan over at most 6 entries per level card - cheap, no memoization
 // needed. A level can appear in two tiers' ranges at once (see
