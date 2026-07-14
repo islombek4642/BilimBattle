@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS questions (
   options JSONB NOT NULL,
   correct_index SMALLINT NOT NULL,
   extra_definitions JSONB,
+  cefr_level TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -29,6 +30,14 @@ CREATE TABLE IF NOT EXISTS questions (
 -- the table is already present, so it would never pick up the new column on
 -- its own. Follow this same pattern for future column additions.
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS extra_definitions JSONB;
+
+-- Nullable: only ingliz_tili rows (imported by the CEFR-aware
+-- importEnglishVocabulary.ts) ever populate this; umumiy_bilim and
+-- sport_kino_musiqa rows leave it NULL. Does not affect
+-- getQuestionsForLevel's level->question mapping (still pure `id` order) -
+-- this column is metadata for transparency/debugging and for
+-- getLevelTierBoundaries (see questionRepository.ts), not a query dimension.
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS cefr_level TEXT;
 
 CREATE TABLE IF NOT EXISTS categories (
   id SERIAL PRIMARY KEY,
