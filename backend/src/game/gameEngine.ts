@@ -2,9 +2,10 @@ import { getIO } from '../socket/socketServer';
 import { getGame, saveGame, deleteGame, GameState } from './gameState';
 import { calculateScore, QUESTION_TIME_LIMIT_MS } from './scoring';
 import { getRandomQuestions, getQuestionsForLevel, QuestionRecord } from '../questions/questionRepository';
-import { recordMatchResult } from '../users/userRepository';
+import { recordMatchResult, getUserById } from '../users/userRepository';
 import { env } from '../config/env';
 import { calculateLevelStars, upsertLevelProgress } from './levelProgress';
+import { checkAndAwardMatchAchievements, checkAndAwardLevelAchievements } from '../achievements/achievements';
 
 export interface PlayerInfo {
   userId: number;
@@ -223,6 +224,24 @@ async function persistMatchResult(
   }
 }
 
+// Shared by finishGame and forfeitIfStillDisconnected - both call
+// persistMatchResult just before this (which updates games_played/
+// current_streak/rating), so both need this same check afterward. Bots are
+// skipped (their "achievements" would never be observed by anyone, since
+// nobody logs in as the synthetic bot user).
+async function awardMatchAchievementsForRealPlayers(players: { userId: number; isBot?: boolean }[]): Promise<void> {
+  for (const player of players) {
+    if (player.isBot) continue;
+    const freshUser = await getUserById(player.userId);
+    if (!freshUser) continue;
+    await checkAndAwardMatchAchievements(player.userId, {
+      gamesPlayed: freshUser.gamesPlayed,
+      currentStreak: freshUser.currentStreak,
+      rating: freshUser.rating,
+    });
+  }
+}
+
 // `socket.data.gameId` is set once when a match starts (matchmaker.ts) or a
 // reconnect succeeds (socketServer.ts's reconnect_game handler), but nothing
 // ever cleared it back to undefined when the match ended - so every
@@ -264,6 +283,7 @@ async function finishGame(gameId: string, opts?: { knockout?: boolean }): Promis
       // get a level_progress row.
       if (!player.isBot) {
         await upsertLevelProgress(player.userId, level, stars);
+        await checkAndAwardLevelAchievements(player.userId, level, stars);
       }
       const socket = getIO().sockets.sockets.get(player.socketId);
       if (socket) {
@@ -291,6 +311,8 @@ async function finishGame(gameId: string, opts?: { knockout?: boolean }): Promis
     player2Score: p2.score,
     winnerId,
   });
+
+  await awardMatchAchievementsForRealPlayers(game.players);
 
   const timer = activeTimers.get(gameId);
   if (timer) clearTimeout(timer);
@@ -459,6 +481,8 @@ async function forfeitIfStillDisconnected(gameId: string, userId: number, versio
     player2Score: game.players[1].score,
     winnerId: opponent.userId,
   });
+
+  await awardMatchAchievementsForRealPlayers(game.players);
 
   clearSocketGameId(game.players);
   await deleteGame(gameId);

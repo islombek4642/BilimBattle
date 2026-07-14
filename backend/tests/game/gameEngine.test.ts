@@ -8,6 +8,7 @@ import { env } from '../../src/config/env';
 import { randomUUID } from 'crypto';
 import * as questionRepository from '../../src/questions/questionRepository';
 import { getLevelProgressForUser } from '../../src/game/levelProgress';
+import { getEarnedAchievements } from '../../src/achievements/achievements';
 
 // See gameEngineDisconnect.test.ts's identical helper for why this specific
 // combination (fake setTimeout/setInterval, real nextTick/setImmediate/
@@ -574,5 +575,113 @@ describe('gameEngine full match flow', () => {
 
     getQuestionsForLevelSpy.mockRestore();
     await pool.query(`DELETE FROM level_progress WHERE level_number = 10 AND user_id IN ($1, $2)`, [player1Id, player2Id]);
+  });
+
+  it('awards a match-based achievement (e.g. first game played) after a level-mode match finishes', async () => {
+    const gameId = randomUUID();
+    const { fakeIO } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    const fixtureQuestions = Array.from({ length: 15 }, (_, i) => ({
+      id: 902000 + i,
+      text: `ACHIEVEMENT_MATCH_TEST_Q${i}`,
+      options: ['a', 'b', 'c', 'd'],
+      correctIndex: 0,
+    }));
+    const getQuestionsForLevelSpy = jest
+      .spyOn(questionRepository, 'getQuestionsForLevel')
+      .mockResolvedValueOnce(fixtureQuestions);
+
+    await startGame(gameId, 'ingliz_tili', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' }, undefined, 30);
+
+    for (let round = 0; round < 15; round += 1) {
+      await submitAnswer(gameId, player1Id, 0, round);
+      await submitAnswer(gameId, player2Id, 1, round);
+    }
+
+    const earned = await getEarnedAchievements(player1Id);
+    expect(earned.some((e) => e.key === 'games_1')).toBe(true);
+
+    getQuestionsForLevelSpy.mockRestore();
+    await pool.query(`DELETE FROM user_achievements WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
+    await pool.query(`DELETE FROM level_progress WHERE level_number = 30 AND user_id IN ($1, $2)`, [player1Id, player2Id]);
+  });
+
+  it('awards level-based achievements (level count, and perfect-stars) after a level-mode match finishes', async () => {
+    const gameId = randomUUID();
+    const { fakeIO } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    // 15 fixture questions, all correctIndex 0 - player1 answers every one
+    // correctly (15/15 -> 3 stars, per calculateLevelStars), player2 answers
+    // every one incorrectly (0/15 -> 0 stars).
+    const fixtureQuestions = Array.from({ length: 15 }, (_, i) => ({
+      id: 902100 + i,
+      text: `ACHIEVEMENT_LEVEL_TEST_Q${i}`,
+      options: ['a', 'b', 'c', 'd'],
+      correctIndex: 0,
+    }));
+    const getQuestionsForLevelSpy = jest
+      .spyOn(questionRepository, 'getQuestionsForLevel')
+      .mockResolvedValueOnce(fixtureQuestions);
+
+    await startGame(gameId, 'ingliz_tili', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' }, undefined, 10);
+
+    for (let round = 0; round < 15; round += 1) {
+      await submitAnswer(gameId, player1Id, 0, round);
+      await submitAnswer(gameId, player2Id, 1, round);
+    }
+
+    const earned1 = await getEarnedAchievements(player1Id);
+    expect(earned1.some((e) => e.key === 'level_10')).toBe(true);
+    expect(earned1.some((e) => e.key === 'level_perfect')).toBe(true);
+
+    const earned2 = await getEarnedAchievements(player2Id);
+    expect(earned2.some((e) => e.key === 'level_10')).toBe(true);
+    expect(earned2.some((e) => e.key === 'level_perfect')).toBe(false); // 0 stars, not perfect
+
+    getQuestionsForLevelSpy.mockRestore();
+    await pool.query(`DELETE FROM user_achievements WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
+    await pool.query(`DELETE FROM level_progress WHERE level_number = 10 AND user_id IN ($1, $2)`, [player1Id, player2Id]);
+  });
+
+  it('does not award any achievement to a bot opponent', async () => {
+    const gameId = randomUUID();
+    const { fakeIO } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    const fixtureQuestions = Array.from({ length: 15 }, (_, i) => ({
+      id: 902200 + i,
+      text: `ACHIEVEMENT_BOT_TEST_Q${i}`,
+      options: ['a', 'b', 'c', 'd'],
+      correctIndex: 0,
+    }));
+    const getQuestionsForLevelSpy = jest
+      .spyOn(questionRepository, 'getQuestionsForLevel')
+      .mockResolvedValueOnce(fixtureQuestions);
+
+    await startGame(gameId, 'ingliz_tili', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2', isBot: true }, undefined, 40);
+
+    for (let round = 0; round < 15; round += 1) {
+      await submitAnswer(gameId, player1Id, 0, round);
+      await submitAnswer(gameId, player2Id, 1, round);
+    }
+
+    // player2 is flagged isBot here via startGame's PlayerInfo, but keeps its
+    // OWN real userId (player2Id) in this test rather than swapping in a
+    // separate bot user row - the point of this test is only to prove the
+    // `!player.isBot` guard genuinely skips awarding when isBot is true,
+    // not to exercise the real getOrCreateBotUser() flow (that's covered
+    // elsewhere, e.g. matchmaker.test.ts's bot-fallback tests).
+    const earned2 = await getEarnedAchievements(player2Id);
+    expect(earned2.length).toBe(0);
+
+    getQuestionsForLevelSpy.mockRestore();
+    // Clean up both players' achievement rows regardless of the assertion's
+    // outcome - if the `!player.isBot` guard were ever broken, player2
+    // would have rows here too, and a cleanup scoped to only player1 would
+    // leave them behind to contaminate a later test run.
+    await pool.query(`DELETE FROM user_achievements WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
+    await pool.query(`DELETE FROM level_progress WHERE level_number = 40 AND user_id IN ($1, $2)`, [player1Id, player2Id]);
   });
 });
