@@ -11,6 +11,7 @@ export type Screen =
   | { name: 'result'; scores: ScoreEntry[]; winnerId: number | null; forfeited: boolean; knockout: boolean; level: number; levelStars?: number }
   | { name: 'leaderboard' }
   | { name: 'settings' }
+  | { name: 'achievements' }
   | { name: 'admin' };
 
 interface NavigationContextValue {
