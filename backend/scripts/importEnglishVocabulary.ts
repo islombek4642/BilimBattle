@@ -105,6 +105,7 @@ import { promises as fs } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { pool } from '../src/config/db';
+import { loadCefrCsvFiles, joinCefrWithDefinitions, groupAndSortByTier, CefrVocabEntry, CefrTier } from './cefrVocabulary';
 
 const DATASET_URL =
   'https://huggingface.co/api/datasets/MongoDB/english-words-definitions/parquet/default/train/0.parquet';
@@ -117,14 +118,26 @@ const INSERT_CHUNK_SIZE = 500;
 // (dist/scripts/../data). Bundling this avoids depending on Hugging Face's
 // CDN being reachable from wherever this script runs at all.
 const BUNDLED_PARQUET_PATH = path.join(__dirname, '..', 'data', 'english-words-definitions.parquet');
+// Unlike BUNDLED_PARQUET_PATH (which exists because the parquet dataset
+// originally had to be *downloaded* and only got bundled later as a
+// network-independence fix), these two CEFR CSVs were bundled from day
+// one - there's no staged-file/download-fallback tier for them, they're
+// just always read directly from here.
+const CEFR_WORDS_CSV_PATH = path.join(__dirname, '..', 'data', 'cefr-words.csv');
+const CEFR_WORD_POS_CSV_PATH = path.join(__dirname, '..', 'data', 'cefr-word-pos.csv');
+const TIER_ORDER: CefrTier[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
-async function assertNotAlreadyImported(): Promise<void> {
-  const existing = await pool.query('SELECT COUNT(*) FROM questions WHERE category = $1', [CATEGORY_KEY]);
-  const count = Number(existing.rows[0].count);
-  if (count > 0) {
+// Full replace is destructive (drops every existing ingliz_tili row and all
+// level_progress), so it requires an explicit CLI flag rather than running
+// automatically - this can never be fired by accident the way a bare `node
+// dist/scripts/importEnglishVocabulary.js` used to be safe-by-default
+// (refusing if data already existed). Run as: node
+// dist/scripts/importEnglishVocabulary.js --confirm-replace
+function assertConfirmedReplace(): void {
+  if (!process.argv.includes('--confirm-replace')) {
     throw new Error(
-      `${CATEGORY_KEY} already has ${count} questions - refusing to import again and duplicate them. ` +
-        `Delete existing rows first if you really want to re-import (DELETE FROM questions WHERE category = '${CATEGORY_KEY}').`
+      `This import FULLY REPLACES the '${CATEGORY_KEY}' question pool and clears level_progress for every user. ` +
+        `Re-run with --confirm-replace to proceed, e.g.: node dist/scripts/importEnglishVocabulary.js --confirm-replace`
     );
   }
 }
@@ -219,19 +232,30 @@ async function loadVocabEntries(parquetPath: string): Promise<VocabEntry[]> {
   return entries;
 }
 
-async function insertQuestionRows(rows: BuiltQuestionRow[]): Promise<void> {
+interface QuestionRowWithTier extends BuiltQuestionRow {
+  cefrTier: CefrTier;
+}
+
+async function insertQuestionRows(rows: QuestionRowWithTier[]): Promise<void> {
   for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
     const chunk = rows.slice(i, i + INSERT_CHUNK_SIZE);
     const values: unknown[] = [];
     const placeholders = chunk
       .map((row, idx) => {
-        const base = idx * 5;
-        values.push(CATEGORY_KEY, row.text, JSON.stringify(row.options), row.correctIndex, JSON.stringify(row.extraDefinitions));
-        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+        const base = idx * 6;
+        values.push(
+          CATEGORY_KEY,
+          row.text,
+          JSON.stringify(row.options),
+          row.correctIndex,
+          JSON.stringify(row.extraDefinitions),
+          row.cefrTier
+        );
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`;
       })
       .join(', ');
     await pool.query(
-      `INSERT INTO questions (category, question_text, options, correct_index, extra_definitions) VALUES ${placeholders}`,
+      `INSERT INTO questions (category, question_text, options, correct_index, extra_definitions, cefr_level) VALUES ${placeholders}`,
       values
     );
     console.log(`Inserted ${Math.min(i + INSERT_CHUNK_SIZE, rows.length)}/${rows.length} rows`);
@@ -239,24 +263,44 @@ async function insertQuestionRows(rows: BuiltQuestionRow[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  assertConfirmedReplace();
+
   const parquetPath = path.join(os.tmpdir(), 'english-words-definitions.parquet');
 
   try {
-    await assertNotAlreadyImported();
+    console.log(`Deleting existing '${CATEGORY_KEY}' questions and all level_progress...`);
+    const deleted = await pool.query(`DELETE FROM questions WHERE category = $1`, [CATEGORY_KEY]);
+    console.log(`Deleted ${deleted.rowCount} existing '${CATEGORY_KEY}' rows.`);
+    await pool.query(`DELETE FROM level_progress`);
 
     await ensureParquetFile(parquetPath);
 
-    console.log('Parsing dataset...');
-    const entries = await loadVocabEntries(parquetPath);
-    console.log(`Loaded ${entries.length} vocabulary entries`);
+    console.log('Parsing definitions dataset...');
+    const definitionsPool = await loadVocabEntries(parquetPath);
+    console.log(`Loaded ${definitionsPool.length} definitions entries`);
 
-    console.log('Shuffling entries...');
-    shuffleInPlace(entries);
+    console.log('Loading CEFR word levels...');
+    const cefrLevels = await loadCefrCsvFiles(CEFR_WORDS_CSV_PATH, CEFR_WORD_POS_CSV_PATH);
+    console.log(`Loaded CEFR levels for ${cefrLevels.size} distinct words`);
 
-    console.log('Building question rows...');
-    const rows = entries.map((entry, index) => buildQuestionRow(entry, index, entries));
+    console.log('Joining CEFR words with definitions...');
+    const joined = joinCefrWithDefinitions(cefrLevels, definitionsPool);
+    console.log(`Matched ${joined.length} CEFR words with a definition`);
 
-    console.log('Inserting into the database...');
+    const byTier = groupAndSortByTier(joined);
+
+    console.log('Building question rows per tier (in A1 -> C2 insertion order)...');
+    const rows: QuestionRowWithTier[] = [];
+    for (const tier of TIER_ORDER) {
+      const tierEntries: CefrVocabEntry[] = byTier.get(tier)!;
+      console.log(`  ${tier}: ${tierEntries.length} words -> ${Math.floor(tierEntries.length / 15)} levels`);
+      tierEntries.forEach((entry, index) => {
+        const row = buildQuestionRow(entry, index, tierEntries);
+        rows.push({ ...row, cefrTier: tier });
+      });
+    }
+
+    console.log(`Inserting ${rows.length} question rows into the database...`);
     await insertQuestionRows(rows);
 
     console.log('Done.');
