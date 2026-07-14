@@ -1,12 +1,13 @@
 // frontend/src/screens/ResultScreen.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ResultScreen, calculateStars } from './ResultScreen';
 import * as authContext from '../context/AuthContext';
 import * as navigationContext from '../context/NavigationContext';
 import * as gameSocketContext from '../context/GameSocketContext';
 import * as telegram from '../telegram/webApp';
 import * as feedback from '../utils/feedback';
+import * as achievementsApi from '../api/achievements';
 
 describe('ResultScreen', () => {
   const reset = vi.fn();
@@ -258,6 +259,53 @@ describe('ResultScreen', () => {
     fireEvent.click(screen.getByText("Yana o'ynash"));
     expect(joinLevelQueue).toHaveBeenCalledWith(5);
     expect(reset).toHaveBeenCalledWith({ name: 'waiting', level: 5, intent: 'quick' });
+  });
+
+  it('shows a "Yangi nishon!" banner when a newly earned achievement is detected after the match', async () => {
+    localStorage.clear();
+    vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
+      catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: '...' }],
+      earned: [{ key: 'games_1', earnedAt: '2026-07-14T00:00:00.000Z' }],
+    });
+
+    render(<ResultScreen scores={[]} winnerId={null} forfeited={false} knockout={false} level={5} />);
+
+    await screen.findByText(/Yangi nishon: Birinchi qadam/);
+  });
+
+  it('shows the achievement banner in the level-complete branch too', async () => {
+    localStorage.clear();
+    vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
+      catalog: [{ key: 'level_10', category: 'level', label: 'Bosqichlar ustasi I', description: '...' }],
+      earned: [{ key: 'level_10', earnedAt: '2026-07-14T00:00:00.000Z' }],
+    });
+
+    render(<ResultScreen scores={[]} winnerId={null} forfeited={false} knockout={false} level={10} levelStars={2} />);
+
+    await screen.findByText(/Yangi nishon: Bosqichlar ustasi I/);
+  });
+
+  it('does not show a banner when there is nothing newly earned', async () => {
+    localStorage.clear();
+    vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({ catalog: [], earned: [] });
+
+    render(<ResultScreen scores={[]} winnerId={null} forfeited={false} knockout={false} level={5} />);
+
+    await waitFor(() => expect(achievementsApi.getAchievements).toHaveBeenCalled());
+    expect(screen.queryByText(/Yangi nishon/)).not.toBeInTheDocument();
+  });
+
+  it('does not re-show a banner for an achievement already seen on a previous visit', async () => {
+    localStorage.setItem('bilimbattle:seenAchievements', JSON.stringify(['games_1']));
+    vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
+      catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: '...' }],
+      earned: [{ key: 'games_1', earnedAt: '2026-07-14T00:00:00.000Z' }],
+    });
+
+    render(<ResultScreen scores={[]} winnerId={null} forfeited={false} knockout={false} level={5} />);
+
+    await waitFor(() => expect(achievementsApi.getAchievements).toHaveBeenCalled());
+    expect(screen.queryByText(/Yangi nishon/)).not.toBeInTheDocument();
   });
 });
 

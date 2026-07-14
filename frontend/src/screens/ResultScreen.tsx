@@ -1,11 +1,13 @@
 // frontend/src/screens/ResultScreen.tsx
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useGameSocketContext } from '../context/GameSocketContext';
 import { shareInviteLink } from '../telegram/webApp';
 import { findMyScore, findOpponentScore } from '../utils/score';
 import { playResultFeedback } from '../utils/feedback';
+import { getAchievements } from '../api/achievements';
+import { findAndMarkNewlySeenAchievements } from '../utils/achievementSeen';
 import { ScoreEntry } from '../api/types';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
@@ -40,7 +42,7 @@ export function ResultScreen({
   level: number;
   levelStars?: number;
 }) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { reset } = useNavigation();
   const { joinLevelQueue } = useGameSocketContext();
   const isWinner = winnerId === user?.id;
@@ -55,6 +57,25 @@ export function ResultScreen({
     playResultFeedback(isDraw ? 'draw' : isWinner ? 'win' : 'loss');
   }, []);
 
+  const [newAchievementLabel, setNewAchievementLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    getAchievements(token)
+      .then((res) => {
+        if (cancelled) return;
+        const newly = findAndMarkNewlySeenAchievements(res.earned.map((e) => e.key));
+        if (newly.length === 0) return;
+        const catalogByKey = new Map(res.catalog.map((a) => [a.key, a]));
+        setNewAchievementLabel(catalogByKey.get(newly[0])?.label ?? newly[0]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   if (!user) return null;
 
   const myScore = findMyScore(scores, user.id);
@@ -68,6 +89,11 @@ export function ResultScreen({
   if (isLevelResult) {
     return (
       <div className="flex min-h-full flex-col justify-center gap-8 p-6">
+        {newAchievementLabel && (
+          <div className="animate-star-pop rounded-2xl bg-ios-gold/10 px-4 py-3 text-center text-sm font-semibold text-ios-label">
+            🏆 Yangi nishon: {newAchievementLabel}
+          </div>
+        )}
         <div className="flex flex-col items-center gap-3 rounded-2xl bg-ios-card px-6 py-10 text-center shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
           <h2 className="text-2xl font-bold text-ios-label">{level}-bosqich tugadi!</h2>
           <div className="flex gap-1" data-testid="level-stars">
@@ -117,6 +143,11 @@ export function ResultScreen({
 
   return (
     <div className="flex min-h-full flex-col justify-center gap-8 p-6">
+      {newAchievementLabel && (
+        <div className="animate-star-pop rounded-2xl bg-ios-gold/10 px-4 py-3 text-center text-sm font-semibold text-ios-label">
+          🏆 Yangi nishon: {newAchievementLabel}
+        </div>
+      )}
       <div className="flex flex-col items-center gap-3 rounded-2xl bg-ios-card px-6 py-10 text-center shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
         <h2 className={`text-2xl font-bold ${resultColor}`}>{resultText}</h2>
         {forfeited && (
