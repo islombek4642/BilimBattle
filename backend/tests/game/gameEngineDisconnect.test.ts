@@ -79,6 +79,12 @@ describe('gameEngine disconnect/reconnect handling', () => {
 
   afterAll(async () => {
     await pool.query(`DELETE FROM matches WHERE player1_id = $1 OR player2_id = $1`, [player1Id]);
+    // Forfeits in this suite now also run awardMatchAchievementsForRealPlayers
+    // (gameEngine.ts), which can insert rows into user_achievements for
+    // player1Id/player2Id (e.g. the "first game played" achievement) - those
+    // rows must be cleared before deleting the users themselves, or the
+    // DELETE below trips user_achievements_user_id_fkey.
+    await pool.query(`DELETE FROM user_achievements WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
     await pool.query(`DELETE FROM users WHERE telegram_id IN (7101, 7102)`);
     await pool.end();
     await closeRedis();
