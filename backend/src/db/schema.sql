@@ -70,6 +70,13 @@ CREATE TABLE IF NOT EXISTS level_progress (
   PRIMARY KEY (user_id, level_number)
 );
 
+CREATE TABLE IF NOT EXISTS user_achievements (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  achievement_key TEXT NOT NULL,
+  earned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, achievement_key)
+);
+
 CREATE INDEX IF NOT EXISTS idx_questions_category_id ON questions(category, id);
 -- idx_questions_category (category) is now redundant: the composite
 -- idx_questions_category_id (category, id) already satisfies any query the
