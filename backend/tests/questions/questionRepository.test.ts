@@ -8,6 +8,7 @@ import {
   insertQuestions,
   getQuestionsForLevel,
   maxAvailableLevel,
+  getLevelTierBoundaries,
 } from '../../src/questions/questionRepository';
 
 describe('questionRepository', () => {
@@ -209,6 +210,67 @@ describe('questionRepository', () => {
       const emptyExtra = questions.find((q) => q.text === 'TEST_REPO_EmptyExtra');
 
       expect(emptyExtra?.extraDefinitions).toBeUndefined();
+    });
+  });
+
+  describe('getLevelTierBoundaries', () => {
+    // These tests insert their OWN small, clearly-tagged batch of
+    // ingliz_tili rows with a real cefr_level set, then clean them up
+    // afterward - the category's real bulk-imported rows (whether the old
+    // untiered 466k set or, later, the new CEFR-tiered set) all have
+    // question_text values that could never collide with these fixture
+    // strings, so this is safe to run against the same shared category the
+    // rest of this file's tests use.
+    const FIXTURE_MARKER = 'CEFR_BOUNDARY_TEST_FIXTURE';
+
+    afterEach(async () => {
+      await pool.query(`DELETE FROM questions WHERE question_text LIKE $1`, [`${FIXTURE_MARKER}%`]);
+    });
+
+    async function insertFixtureRows(cefrLevel: string, count: number): Promise<void> {
+      for (let i = 0; i < count; i += 1) {
+        await pool.query(
+          `INSERT INTO questions (category, question_text, options, correct_index, cefr_level)
+           VALUES ($1, $2, $3, $4, $5)`,
+          ['ingliz_tili', `${FIXTURE_MARKER}_${cefrLevel}_${i}`, JSON.stringify(['a', 'b', 'c', 'd']), 0, cefrLevel]
+        );
+      }
+    }
+
+    it('returns no boundaries when there are no cefr_level-tagged rows yet', async () => {
+      // The real category's bulk-imported rows (pre-CEFR-migration) all have
+      // cefr_level IS NULL, so with no fixture rows inserted, this must be
+      // empty - proving the function genuinely filters on cefr_level rather
+      // than returning something derived from the whole (untagged) category.
+      expect(await getLevelTierBoundaries()).toEqual([]);
+    });
+
+    it('computes contiguous level ranges per tier, in insertion order, from row counts alone', async () => {
+      await insertFixtureRows('A1', 15); // exactly 1 full level
+      await insertFixtureRows('A2', 30); // exactly 2 full levels
+
+      const boundaries = await getLevelTierBoundaries();
+      // Only these two fixture tiers should be present - real bulk category
+      // data (if any exists in this environment) is untagged (cefr_level
+      // NULL) and is excluded by definition.
+      expect(boundaries).toEqual([
+        { tier: 'A1', fromLevel: 1, toLevel: 1 },
+        { tier: 'A2', fromLevel: 2, toLevel: 3 },
+      ]);
+    });
+
+    it('rounds a tier with a partial (non-multiple-of-15) row count up to include the shared boundary level', async () => {
+      // 20 rows = 1 full level (15) + 5 leftover rows that spill into a
+      // second, partially-shared level - this is an accepted, documented
+      // simplification (see the design spec's Risks section): a level
+      // straddling a tier boundary may contain words from two tiers, and
+      // both tiers legitimately claim it via an overlapping toLevel/
+      // fromLevel, rather than either tier silently losing those rows from
+      // every boundary computation.
+      await insertFixtureRows('B1', 20);
+
+      const boundaries = await getLevelTierBoundaries();
+      expect(boundaries).toEqual([{ tier: 'B1', fromLevel: 1, toLevel: 2 }]);
     });
   });
 });

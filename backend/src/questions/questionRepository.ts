@@ -191,3 +191,43 @@ export async function maxAvailableLevel(): Promise<number> {
   );
   return Math.floor(Number(result.rows[0].count) / LEVEL_QUESTION_COUNT);
 }
+
+export interface LevelTierBoundary {
+  tier: string;
+  fromLevel: number;
+  toLevel: number;
+}
+
+// Computes which level numbers fall in which CEFR tier, purely from how
+// many ingliz_tili rows exist per tier and the order tiers were inserted in
+// (importEnglishVocabulary.ts inserts one tier's rows fully before moving to
+// the next - see the CEFR vocabulary design spec). Six rows at most (one
+// per tier actually present), cheap to compute per request - no caching
+// needed at this scale.
+//
+// A tier whose row count isn't an exact multiple of 15 leaves a "leftover"
+// handful of rows that get absorbed into a level shared with the NEXT
+// tier - fromLevel/toLevel are computed cumulatively (not per-tier in
+// isolation) so that shared boundary level is honestly reflected as
+// belonging to both tiers' ranges, rather than either tier's leftover rows
+// silently vanishing from the tally. This never drifts from
+// maxAvailableLevel()'s independent floor(totalCount/15) total, since every
+// row is still counted exactly once towards SOME tier's cumulative total.
+export async function getLevelTierBoundaries(): Promise<LevelTierBoundary[]> {
+  const result = await pool.query<{ cefr_level: string; count: string }>(
+    `SELECT cefr_level, COUNT(*) AS count
+     FROM questions WHERE category = $1 AND cefr_level IS NOT NULL
+     GROUP BY cefr_level ORDER BY MIN(id) ASC`,
+    [LEVEL_CATEGORY_KEY]
+  );
+
+  const boundaries: LevelTierBoundary[] = [];
+  let cumulativeRows = 0;
+  for (const row of result.rows) {
+    const fromLevel = Math.floor(cumulativeRows / LEVEL_QUESTION_COUNT) + 1;
+    cumulativeRows += Number(row.count);
+    const toLevel = Math.ceil(cumulativeRows / LEVEL_QUESTION_COUNT);
+    boundaries.push({ tier: row.cefr_level, fromLevel, toLevel });
+  }
+  return boundaries;
+}
