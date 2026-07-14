@@ -46,4 +46,9 @@ describe('GET /api/level-progress', () => {
     const res = await request(app).get('/api/level-progress').set('Authorization', `Bearer ${token}`);
     expect(res.body.progress).toEqual([{ levelNumber: 2, stars: 3 }]);
   });
+
+  it('includes tierBoundaries in the response (empty when no cefr_level rows exist yet)', async () => {
+    const res = await request(app).get('/api/level-progress').set('Authorization', `Bearer ${token}`);
+    expect(Array.isArray(res.body.tierBoundaries)).toBe(true);
+  });
 });
