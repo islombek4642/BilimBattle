@@ -797,8 +797,11 @@ Read `frontend/src/screens/LevelSelectScreen.test.tsx` in full first (each exist
     render(<LevelSelectScreen intent="quick" />);
     await screen.findByText('1');
 
-    const level1Button = screen.getByRole('button', { name: /1/ });
-    const level3Button = screen.getByRole('button', { name: /3/ });
+    // Anchored (not just /1/, /3/): the badge text itself (e.g. "A1") can
+    // contain a digit that collides with an unanchored level-number match
+    // (level 2's card here reads "2 A1" - /1/ would match it too).
+    const level1Button = screen.getByRole('button', { name: /^1/ });
+    const level3Button = screen.getByRole('button', { name: /^3/ });
     expect(level1Button).toHaveTextContent('A1');
     expect(level3Button).toHaveTextContent('A2');
   });
