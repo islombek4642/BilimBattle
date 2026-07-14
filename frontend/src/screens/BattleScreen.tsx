@@ -202,7 +202,7 @@ export function BattleScreen({ gameId, level }: { gameId: string; level: number 
               type="button"
               disabled={selectedOption !== null}
               onClick={() => handleSelect(index)}
-              className={`w-full rounded-2xl py-4 text-left font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)] transition-all duration-300 ease-out active:scale-[0.96] disabled:active:scale-100 ${
+              className={`flex w-full items-center rounded-2xl py-4 text-left font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)] transition-all duration-300 ease-out active:scale-[0.96] disabled:active:scale-100 ${
                 isCorrect
                   ? 'bg-ios-green text-white'
                   : isSelected
@@ -210,7 +210,7 @@ export function BattleScreen({ gameId, level }: { gameId: string; level: number 
                     : 'bg-ios-card text-ios-label'
               }`}
             >
-              <span className={`px-5 ${optionTextSizeClass(option)}`}>{option}</span>
+              <span className={`text-balance px-5 ${optionTextSizeClass(option)}`}>{option}</span>
             </button>
           );
         })}
