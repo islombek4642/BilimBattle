@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useGameSocketContext } from '../context/GameSocketContext';
-import { getLevelProgress, LevelProgressEntry } from '../api/levelProgress';
+import { getLevelProgress, LevelProgressEntry, LevelTierBoundary } from '../api/levelProgress';
 
 const LEVELS_PER_STAGE = 10;
 const STAGE_UNLOCK_STARS_REQUIRED = 25;
@@ -26,12 +26,22 @@ function isLevelUnlocked(level: number, progressByLevel: Map<number, number>): b
   return (progressByLevel.get(level - 1) ?? 0) >= LEVEL_UNLOCK_STARS_REQUIRED;
 }
 
+// Linear scan over at most 6 entries per level card - cheap, no memoization
+// needed. A level can appear in two tiers' ranges at once (see
+// getLevelTierBoundaries' doc comment on shared boundary levels) - find()
+// returns the first (earlier, easier) match, which is a harmless,
+// intentional simplification for this cosmetic badge.
+function tierForLevel(level: number, tierBoundaries: LevelTierBoundary[]): string | null {
+  return tierBoundaries.find((b) => level >= b.fromLevel && level <= b.toLevel)?.tier ?? null;
+}
+
 export function LevelSelectScreen({ intent }: { intent: 'quick' | 'invite' }) {
   const { token } = useAuth();
   const { navigate } = useNavigation();
   const { joinLevelQueue, createLevelInvite } = useGameSocketContext();
   const [progress, setProgress] = useState<LevelProgressEntry[]>([]);
   const [maxAvailableLevel, setMaxAvailableLevel] = useState(0);
+  const [tierBoundaries, setTierBoundaries] = useState<LevelTierBoundary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -46,6 +56,7 @@ export function LevelSelectScreen({ intent }: { intent: 'quick' | 'invite' }) {
         if (cancelled) return;
         setProgress(res.progress);
         setMaxAvailableLevel(res.maxAvailableLevel);
+        setTierBoundaries(res.tierBoundaries);
       })
       .catch(() => {
         if (cancelled) return;
@@ -107,6 +118,7 @@ export function LevelSelectScreen({ intent }: { intent: 'quick' | 'invite' }) {
               const unlocked = isLevelUnlocked(level, progressByLevel);
               const stars = progressByLevel.get(level) ?? 0;
               const played = progressByLevel.has(level);
+              const tier = tierForLevel(level, tierBoundaries);
               return (
                 <button
                   key={level}
@@ -118,6 +130,7 @@ export function LevelSelectScreen({ intent }: { intent: 'quick' | 'invite' }) {
                   }`}
                 >
                   <span>{level}</span>
+                  {tier && <span className="text-[10px] font-medium text-ios-secondary-label">{tier}</span>}
                   {played && (
                     <span className="text-xs text-ios-gold">{'★'.repeat(stars)}{'☆'.repeat(3 - stars)}</span>
                   )}

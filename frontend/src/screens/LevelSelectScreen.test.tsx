@@ -34,6 +34,7 @@ describe('LevelSelectScreen', () => {
     vi.spyOn(levelProgressApi, 'getLevelProgress').mockResolvedValue({
       progress: [{ levelNumber: 1, stars: 3 }],
       maxAvailableLevel: 5,
+      tierBoundaries: [],
     });
 
     render(<LevelSelectScreen intent="quick" />);
@@ -47,6 +48,7 @@ describe('LevelSelectScreen', () => {
     vi.spyOn(levelProgressApi, 'getLevelProgress').mockResolvedValue({
       progress: [],
       maxAvailableLevel: 3,
+      tierBoundaries: [],
     });
 
     render(<LevelSelectScreen intent="quick" />);
@@ -58,6 +60,7 @@ describe('LevelSelectScreen', () => {
     vi.spyOn(levelProgressApi, 'getLevelProgress').mockResolvedValue({
       progress: [{ levelNumber: 1, stars: 1 }], // only 1 star - level 2 needs >=2
       maxAvailableLevel: 5,
+      tierBoundaries: [],
     });
 
     render(<LevelSelectScreen intent="quick" />);
@@ -69,6 +72,7 @@ describe('LevelSelectScreen', () => {
     vi.spyOn(levelProgressApi, 'getLevelProgress').mockResolvedValue({
       progress: [],
       maxAvailableLevel: 3,
+      tierBoundaries: [],
     });
 
     render(<LevelSelectScreen intent="quick" />);
@@ -83,6 +87,7 @@ describe('LevelSelectScreen', () => {
     vi.spyOn(levelProgressApi, 'getLevelProgress').mockResolvedValue({
       progress: [],
       maxAvailableLevel: 3,
+      tierBoundaries: [],
     });
     vi.spyOn(navigationContext, 'useNavigation').mockReturnValue({
       current: { name: 'levelSelect', intent: 'invite' },
@@ -102,5 +107,23 @@ describe('LevelSelectScreen', () => {
 
     render(<LevelSelectScreen intent="quick" />);
     await waitFor(() => expect(screen.getByText(/yuklab bo'lmadi/i)).toBeInTheDocument());
+  });
+
+  it('shows the CEFR tier badge on each level card, based on tierBoundaries', async () => {
+    vi.spyOn(levelProgressApi, 'getLevelProgress').mockResolvedValue({
+      progress: [],
+      maxAvailableLevel: 3,
+      tierBoundaries: [{ tier: 'A1', fromLevel: 1, toLevel: 2 }, { tier: 'A2', fromLevel: 3, toLevel: 3 }],
+    });
+
+    render(<LevelSelectScreen intent="quick" />);
+    await screen.findByText('1');
+
+    // Anchored to start: the tier badge text ("A1") itself contains the digit
+    // "1", so an unanchored /1/ would also match level 2's button ("2 A1").
+    const level1Button = screen.getByRole('button', { name: /^1/ });
+    const level3Button = screen.getByRole('button', { name: /^3/ });
+    expect(level1Button).toHaveTextContent('A1');
+    expect(level3Button).toHaveTextContent('A2');
   });
 });

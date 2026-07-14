@@ -6,9 +6,16 @@ export interface LevelProgressEntry {
   stars: number;
 }
 
+export interface LevelTierBoundary {
+  tier: string;
+  fromLevel: number;
+  toLevel: number;
+}
+
 export interface LevelProgressResponse {
   progress: LevelProgressEntry[];
   maxAvailableLevel: number;
+  tierBoundaries: LevelTierBoundary[];
 }
 
 export function getLevelProgress(token: string): Promise<LevelProgressResponse> {
