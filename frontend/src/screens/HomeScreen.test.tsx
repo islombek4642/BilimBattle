@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { HomeScreen } from './HomeScreen';
 import * as authContext from '../context/AuthContext';
 import * as navigationContext from '../context/NavigationContext';
+import * as gameSocketContext from '../context/GameSocketContext';
 import * as statsApi from '../api/stats';
 import * as achievementsApi from '../api/achievements';
 import * as levelProgressApi from '../api/levelProgress';
@@ -11,10 +12,12 @@ import * as leaderboardApi from '../api/leaderboard';
 
 describe('HomeScreen', () => {
   const navigate = vi.fn();
+  const joinLevelQueue = vi.fn();
 
   beforeEach(() => {
     vi.restoreAllMocks();
     navigate.mockClear();
+    joinLevelQueue.mockClear();
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
       token: 'tok', user: { id: 1, telegramId: 555, firstName: 'Aziz' } as any, loading: false, error: null,
     });
@@ -22,6 +25,9 @@ describe('HomeScreen', () => {
       current: { name: 'home' },
       navigate, goBack: vi.fn(), replace: vi.fn(), reset: vi.fn(),
     });
+    vi.spyOn(gameSocketContext, 'useGameSocketContext').mockReturnValue({
+      joinLevelQueue,
+    } as any);
     vi.spyOn(statsApi, 'getMyStats').mockResolvedValue({
       gamesPlayed: 5, gamesWon: 3, winRate: 60, currentStreak: 2, bestStreak: 4, rating: 1100,
     });
@@ -76,7 +82,7 @@ describe('HomeScreen', () => {
     expect(screen.queryByText('Hammasi')).not.toBeInTheDocument();
   });
 
-  it('shows a "Davom etish" shortcut to the next unlocked, unfinished level', async () => {
+  it('shows a "Davom etish" shortcut that immediately joins the queue and starts the shown level', async () => {
     vi.spyOn(levelProgressApi, 'getLevelProgress').mockResolvedValue({
       progress: [{ levelNumber: 1, stars: 3 }], maxAvailableLevel: 5, tierBoundaries: [],
     });
@@ -84,7 +90,8 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
     await screen.findByText('Davom etish: 2-bosqich');
     fireEvent.click(screen.getByText('Davom etish: 2-bosqich'));
-    expect(navigate).toHaveBeenCalledWith({ name: 'levelSelect', intent: 'quick' });
+    expect(joinLevelQueue).toHaveBeenCalledWith(2);
+    expect(navigate).toHaveBeenCalledWith({ name: 'waiting', level: 2, intent: 'quick' });
   });
 
   it('does not show the continue shortcut when there is no progress data yet', async () => {

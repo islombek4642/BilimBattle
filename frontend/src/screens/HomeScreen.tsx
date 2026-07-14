@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Lightning, UserPlus, Flame, Star, Trophy } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
+import { useGameSocketContext } from '../context/GameSocketContext';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
 import { BattleAvatar } from '../components/BattleAvatar';
@@ -20,6 +21,7 @@ const LEADERBOARD_PREVIEW_SIZE = 3;
 export function HomeScreen() {
   const { user, token } = useAuth();
   const { navigate } = useNavigation();
+  const { joinLevelQueue } = useGameSocketContext();
   const [stats, setStats] = useState<Stats | null>(null);
   const [catalog, setCatalog] = useState<Achievement[]>([]);
   const [earned, setEarned] = useState<EarnedAchievement[]>([]);
@@ -74,7 +76,7 @@ export function HomeScreen() {
       <div className="flex items-center gap-3">
         <BattleAvatar telegramId={user.telegramId} size={44} />
         {stats && (
-          <div className="ml-auto flex shrink-0 items-center gap-3">
+          <div className="animate-fade-in-up ml-auto flex shrink-0 items-center gap-3">
             <span className="flex items-center gap-1 text-sm font-bold text-ios-orange">
               <Flame size={16} weight="fill" />
               {stats.currentStreak}
@@ -91,7 +93,7 @@ export function HomeScreen() {
         <button
           type="button"
           onClick={() => navigate({ name: 'achievements' })}
-          className="flex items-center gap-2 overflow-x-auto rounded-2xl bg-ios-card p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]"
+          className="animate-fade-in-up flex items-center gap-2 overflow-x-auto rounded-2xl bg-ios-card p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]"
         >
           {recentEarned.map((e) => (
             <span
@@ -108,8 +110,11 @@ export function HomeScreen() {
       {nextLevel !== null && (
         <button
           type="button"
-          onClick={() => navigate({ name: 'levelSelect', intent: 'quick' })}
-          className="flex items-center justify-between rounded-2xl bg-ios-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]"
+          onClick={() => {
+            joinLevelQueue(nextLevel);
+            navigate({ name: 'waiting', level: nextLevel, intent: 'quick' });
+          }}
+          className="animate-fade-in-up flex items-center justify-between rounded-2xl bg-ios-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]"
         >
           <span className="text-sm font-medium text-ios-label">Davom etish: {nextLevel}-bosqich</span>
           <span className="text-sm font-semibold text-ios-blue">Boshlash</span>
@@ -135,7 +140,7 @@ export function HomeScreen() {
         <button
           type="button"
           onClick={() => navigate({ name: 'leaderboard' })}
-          className="flex flex-col gap-2 rounded-2xl bg-ios-card p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]"
+          className="animate-fade-in-up flex flex-col gap-2 rounded-2xl bg-ios-card p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]"
         >
           <span className="flex items-center gap-1 text-sm font-semibold text-ios-label">
             <Trophy size={16} weight="fill" className="text-ios-gold" />
