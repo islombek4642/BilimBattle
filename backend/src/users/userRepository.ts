@@ -1,4 +1,5 @@
 import { pool } from '../config/db';
+import { computeStreakUpdate } from '../progression/streakLogic';
 
 export interface User {
   id: number;
@@ -11,6 +12,10 @@ export interface User {
   gamesWon: number;
   currentStreak: number;
   bestStreak: number;
+  dailyStreak: number;
+  bestDailyStreak: number;
+  lastActiveDate: string | null;
+  streakFreezeUsedAt: string | null;
 }
 
 interface UserRow {
@@ -24,6 +29,10 @@ interface UserRow {
   games_won: number;
   current_streak: number;
   best_streak: number;
+  daily_streak: number;
+  best_daily_streak: number;
+  last_active_date: string | null;
+  streak_freeze_used_at: string | null;
 }
 
 function mapRow(row: UserRow): User {
@@ -38,6 +47,10 @@ function mapRow(row: UserRow): User {
     gamesWon: row.games_won,
     currentStreak: row.current_streak,
     bestStreak: row.best_streak,
+    dailyStreak: row.daily_streak,
+    bestDailyStreak: row.best_daily_streak,
+    lastActiveDate: row.last_active_date,
+    streakFreezeUsedAt: row.streak_freeze_used_at,
   };
 }
 
@@ -122,4 +135,38 @@ async function updatePlayerStats(userId: number, won: boolean, hasWinner: boolea
     // rating or streak — only games_played increments.
     await pool.query(`UPDATE users SET games_played = games_played + 1 WHERE id = $1`, [userId]);
   }
+}
+
+// Called once per finished match for each real (non-bot) player (see
+// progression/progressionService.ts). Idempotent within a single day: a
+// second call the same UTC day is a no-op write (computeStreakUpdate's
+// alreadyRecordedToday short-circuits before any UPDATE).
+export async function recordDailyActivity(userId: number): Promise<{ dailyStreak: number; bestDailyStreak: number }> {
+  const user = await getUserById(userId);
+  if (!user) throw new Error(`recordDailyActivity: no such user ${userId}`);
+
+  const today = new Date();
+  const result = computeStreakUpdate(today, {
+    dailyStreak: user.dailyStreak,
+    bestDailyStreak: user.bestDailyStreak,
+    lastActiveDate: user.lastActiveDate ? new Date(user.lastActiveDate) : null,
+    streakFreezeUsedAt: user.streakFreezeUsedAt ? new Date(user.streakFreezeUsedAt) : null,
+  });
+
+  if (result.alreadyRecordedToday) {
+    return { dailyStreak: result.dailyStreak, bestDailyStreak: result.bestDailyStreak };
+  }
+
+  await pool.query(
+    `UPDATE users SET daily_streak = $1, best_daily_streak = $2, last_active_date = $3, streak_freeze_used_at = $4 WHERE id = $5`,
+    [
+      result.dailyStreak,
+      result.bestDailyStreak,
+      result.lastActiveDate?.toISOString().slice(0, 10) ?? null,
+      result.streakFreezeUsedAt?.toISOString().slice(0, 10) ?? null,
+      userId,
+    ]
+  );
+
+  return { dailyStreak: result.dailyStreak, bestDailyStreak: result.bestDailyStreak };
 }
