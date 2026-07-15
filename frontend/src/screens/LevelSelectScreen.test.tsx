@@ -6,6 +6,7 @@ import * as authContext from '../context/AuthContext';
 import * as navigationContext from '../context/NavigationContext';
 import * as gameSocketContext from '../context/GameSocketContext';
 import * as levelProgressApi from '../api/levelProgress';
+import * as profileApi from '../api/profile';
 
 describe('LevelSelectScreen', () => {
   const navigate = vi.fn();
@@ -28,6 +29,10 @@ describe('LevelSelectScreen', () => {
     vi.spyOn(gameSocketContext, 'useGameSocketContext').mockReturnValue({
       joinLevelQueue, createLevelInvite,
     } as any);
+    vi.spyOn(profileApi, 'getProfile').mockResolvedValue({
+      xp: 0, masteryPoints: 0, masteryRank: 'Boshlangich', category: 'ingliz_tili',
+      dailyQuests: [], streak: { current: 0, best: 0, freezeAvailable: true },
+    });
   });
 
   it('shows a loading state, then renders level cards once progress loads', async () => {
@@ -125,5 +130,19 @@ describe('LevelSelectScreen', () => {
     const level3Button = screen.getByRole('button', { name: /^3/ });
     expect(level1Button).toHaveTextContent('A1');
     expect(level3Button).toHaveTextContent('A2');
+  });
+
+  it("shows the user's Mastery badge next to the heading once the profile loads", async () => {
+    vi.spyOn(levelProgressApi, 'getLevelProgress').mockResolvedValue({
+      progress: [], maxAvailableLevel: 3, tierBoundaries: [],
+    });
+    vi.spyOn(profileApi, 'getProfile').mockResolvedValue({
+      xp: 500, masteryPoints: 200, masteryRank: 'Orta', category: 'ingliz_tili',
+      dailyQuests: [], streak: { current: 3, best: 3, freezeAvailable: true },
+    });
+
+    render(<LevelSelectScreen intent="quick" />);
+
+    await screen.findByText("O'rta");
   });
 });

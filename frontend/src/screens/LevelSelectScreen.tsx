@@ -4,7 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useGameSocketContext } from '../context/GameSocketContext';
 import { getLevelProgress, LevelProgressEntry, LevelTierBoundary } from '../api/levelProgress';
+import { getProfile, MasteryRank } from '../api/profile';
 import { isLevelUnlocked, LEVELS_PER_STAGE } from '../utils/levelUnlock';
+import { MasteryBadge } from '../components/MasteryBadge';
 
 // Linear scan over at most 6 entries per level card - cheap, no memoization
 // needed. A level can appear in two tiers' ranges at once (see
@@ -24,6 +26,7 @@ export function LevelSelectScreen({ intent }: { intent: 'quick' | 'invite' }) {
   const [tierBoundaries, setTierBoundaries] = useState<LevelTierBoundary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [masteryRank, setMasteryRank] = useState<MasteryRank | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -50,6 +53,11 @@ export function LevelSelectScreen({ intent }: { intent: 'quick' | 'invite' }) {
     return () => {
       cancelled = true;
     };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    getProfile(token).then((res) => setMasteryRank(res.masteryRank)).catch(() => {});
   }, [token]);
 
   const progressByLevel = new Map(progress.map((p) => [p.levelNumber, p.stars]));
@@ -89,7 +97,10 @@ export function LevelSelectScreen({ intent }: { intent: 'quick' | 'invite' }) {
 
   return (
     <div className="flex flex-col gap-6 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
-      <h2 className="text-lg font-bold text-ios-label">Bosqichlar</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-ios-label">Bosqichlar</h2>
+        {masteryRank && <MasteryBadge rank={masteryRank} />}
+      </div>
       {Array.from(stages.entries()).map(([stage, stageLevels]) => (
         <div key={stage} className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold text-ios-secondary-label">{stage}-etap</h3>
