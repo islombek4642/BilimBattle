@@ -1,6 +1,6 @@
 // frontend/src/screens/HomeScreen.tsx
 import { useEffect, useState } from 'react';
-import { Lightning, UserPlus, Flame, Star, Trophy } from '@phosphor-icons/react';
+import { Lightning, UserPlus, Flame, Star, Trophy, CheckCircle, Circle } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useGameSocketContext } from '../context/GameSocketContext';
@@ -11,6 +11,7 @@ import { getMyStats } from '../api/stats';
 import { getAchievements, Achievement, EarnedAchievement } from '../api/achievements';
 import { getLevelProgress } from '../api/levelProgress';
 import { getGlobalLeaderboard } from '../api/leaderboard';
+import { getProfile, ProfileResponse } from '../api/profile';
 import { findNextLevelToPlay } from '../utils/levelUnlock';
 import { findRank } from '../utils/leaderboardRank';
 import { Stats, LeaderboardEntry } from '../api/types';
@@ -27,6 +28,7 @@ export function HomeScreen() {
   const [earned, setEarned] = useState<EarnedAchievement[]>([]);
   const [nextLevel, setNextLevel] = useState<number | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
 
   // Four independent fetches, none blocking the others - each section of
   // this screen degrades gracefully (simply doesn't render) if its own
@@ -58,6 +60,8 @@ export function HomeScreen() {
     getGlobalLeaderboard(token)
       .then((res) => setLeaderboard(res.leaderboard))
       .catch(() => {});
+
+    getProfile(token).then(setProfile).catch(() => {});
   }, [token]);
 
   if (!user) return null;
@@ -88,6 +92,36 @@ export function HomeScreen() {
           </div>
         )}
       </div>
+
+      {profile && (
+        <div className="animate-fade-in-up flex flex-col gap-2 rounded-2xl bg-ios-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
+          <span className="flex items-center gap-1 text-sm font-semibold text-ios-label">
+            <Flame size={16} weight="fill" className="text-ios-orange" />
+            Kunlik faollik: {profile.streak.current} kun
+          </span>
+          <div className="flex flex-col gap-1.5">
+            {profile.dailyQuests.map((quest) => (
+              <div key={quest.key} className="flex items-center gap-2">
+                {quest.completed ? (
+                  <CheckCircle size={16} weight="fill" className="text-ios-green" />
+                ) : (
+                  <Circle size={16} className="text-ios-secondary-label" />
+                )}
+                <span
+                  className={`flex-1 text-xs ${
+                    quest.completed ? 'text-ios-secondary-label line-through' : 'text-ios-label'
+                  }`}
+                >
+                  {quest.label}
+                </span>
+                <span className="text-xs font-semibold tabular-nums text-ios-secondary-label">
+                  {quest.progress}/{quest.target}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {recentEarned.length > 0 && (
         <button

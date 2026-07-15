@@ -9,6 +9,7 @@ import * as statsApi from '../api/stats';
 import * as achievementsApi from '../api/achievements';
 import * as levelProgressApi from '../api/levelProgress';
 import * as leaderboardApi from '../api/leaderboard';
+import * as profileApi from '../api/profile';
 
 describe('HomeScreen', () => {
   const navigate = vi.fn();
@@ -36,6 +37,10 @@ describe('HomeScreen', () => {
       progress: [], maxAvailableLevel: 0, tierBoundaries: [],
     });
     vi.spyOn(leaderboardApi, 'getGlobalLeaderboard').mockResolvedValue({ leaderboard: [] });
+    vi.spyOn(profileApi, 'getProfile').mockResolvedValue({
+      xp: 0, masteryPoints: 0, masteryRank: 'Boshlangich', category: 'ingliz_tili',
+      dailyQuests: [], streak: { current: 0, best: 0, freezeAvailable: true },
+    });
   });
 
   it('renders nothing while the user is not yet loaded', () => {
@@ -137,5 +142,21 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
     await screen.findByText('2');
     expect(screen.queryByText('Top reyting')).not.toBeInTheDocument();
+  });
+
+  it('shows the Daily Quest card with progress and the daily activity streak once the profile loads', async () => {
+    vi.spyOn(profileApi, 'getProfile').mockResolvedValue({
+      xp: 120, masteryPoints: 40, masteryRank: 'Boshlangich', category: 'ingliz_tili',
+      dailyQuests: [
+        { key: 'matches_3', label: "Bugun 3 ta jang o'ynang", progress: 1, target: 3, completed: false },
+      ],
+      streak: { current: 5, best: 9, freezeAvailable: true },
+    });
+
+    render(<HomeScreen />);
+
+    await screen.findByText("Bugun 3 ta jang o'ynang");
+    expect(screen.getByText('1/3')).toBeInTheDocument();
+    expect(screen.getByText(/Kunlik faollik: 5 kun/)).toBeInTheDocument();
   });
 });
