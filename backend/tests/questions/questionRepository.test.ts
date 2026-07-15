@@ -273,4 +273,34 @@ describe('questionRepository', () => {
       expect(boundaries).toEqual([{ tier: 'B1', fromLevel: 1, toLevel: 2 }]);
     });
   });
+
+  describe('cefrLevel on QuestionRecord', () => {
+    const FIXTURE_CATEGORY = 'test_repo_cefr_field_xyz';
+
+    afterEach(async () => {
+      await pool.query(`DELETE FROM questions WHERE category = $1`, [FIXTURE_CATEGORY]);
+    });
+
+    it('exposes cefr_level as cefrLevel on the returned QuestionRecord', async () => {
+      await pool.query(
+        `INSERT INTO questions (category, question_text, options, correct_index, cefr_level)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [FIXTURE_CATEGORY, 'CEFR_FIELD_TEST_Q', JSON.stringify(['a', 'b']), 0, 'B1']
+      );
+
+      const questions = await getRandomQuestions(FIXTURE_CATEGORY, 1);
+      expect(questions[0].cefrLevel).toBe('B1');
+    });
+
+    it('omits cefrLevel entirely for a row with no cefr_level set', async () => {
+      await pool.query(
+        `INSERT INTO questions (category, question_text, options, correct_index)
+         VALUES ($1, $2, $3, $4)`,
+        [FIXTURE_CATEGORY, 'CEFR_FIELD_TEST_Q_NULL', JSON.stringify(['a', 'b']), 0]
+      );
+
+      const questions = await getRandomQuestions(FIXTURE_CATEGORY, 1);
+      expect(questions[0].cefrLevel).toBeUndefined();
+    });
+  });
 });

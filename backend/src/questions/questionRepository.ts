@@ -8,6 +8,7 @@ export interface QuestionRecord {
   options: string[];
   correctIndex: number;
   extraDefinitions?: string[];
+  cefrLevel?: string;
 }
 
 export interface Category {
@@ -92,6 +93,7 @@ interface QuestionRow {
   options: string[];
   correct_index: number;
   extra_definitions: string[] | null;
+  cefr_level: string | null;
 }
 
 function toQuestionRecord(row: QuestionRow): QuestionRecord {
@@ -101,6 +103,7 @@ function toQuestionRecord(row: QuestionRow): QuestionRecord {
     options: row.options,
     correctIndex: row.correct_index,
     ...(row.extra_definitions && row.extra_definitions.length > 0 ? { extraDefinitions: row.extra_definitions } : {}),
+    ...(row.cefr_level ? { cefrLevel: row.cefr_level } : {}),
   };
 }
 
@@ -133,7 +136,7 @@ export async function getRandomQuestions(category: string, count: number): Promi
   const randomStart = minId + Math.floor(Math.random() * (maxId - minId + 1));
 
   const forwardResult = await pool.query<QuestionRow>(
-    `SELECT id, question_text, options, correct_index, extra_definitions
+    `SELECT id, question_text, options, correct_index, extra_definitions, cefr_level
      FROM questions WHERE category = $1 AND id >= $2 ORDER BY id ASC LIMIT $3`,
     [category, randomStart, count]
   );
@@ -148,7 +151,7 @@ export async function getRandomQuestions(category: string, count: number): Promi
     // of the category" whenever this happens.
     const remaining = count - rows.length;
     const wrapResult = await pool.query<QuestionRow>(
-      `SELECT id, question_text, options, correct_index, extra_definitions
+      `SELECT id, question_text, options, correct_index, extra_definitions, cefr_level
        FROM questions WHERE category = $1 AND id < $2 ORDER BY id DESC LIMIT $3`,
       [category, randomStart, remaining]
     );
@@ -177,7 +180,7 @@ const LEVEL_QUESTION_COUNT = 15;
 export async function getQuestionsForLevel(level: number): Promise<QuestionRecord[]> {
   const offset = (level - 1) * LEVEL_QUESTION_COUNT;
   const result = await pool.query<QuestionRow>(
-    `SELECT id, question_text, options, correct_index, extra_definitions
+    `SELECT id, question_text, options, correct_index, extra_definitions, cefr_level
      FROM questions WHERE category = $1 ORDER BY id ASC OFFSET $2 LIMIT $3`,
     [LEVEL_CATEGORY_KEY, offset, LEVEL_QUESTION_COUNT]
   );
