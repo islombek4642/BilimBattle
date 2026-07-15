@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ProfileScreen } from './ProfileScreen';
 import * as authContext from '../context/AuthContext';
 import * as navigationContext from '../context/NavigationContext';
@@ -65,5 +65,13 @@ describe('ProfileScreen', () => {
     await screen.findByText('Birinchi qadam');
     fireEvent.click(screen.getByText("Barcha yutuqlarni ko'rish"));
     expect(navigate).toHaveBeenCalledWith({ name: 'achievements' });
+  });
+
+  it('shows an error message when the profile fetch fails', async () => {
+    vi.spyOn(profileApi, 'getProfile').mockRejectedValue(new Error('network down'));
+
+    render(<ProfileScreen />);
+
+    await waitFor(() => expect(screen.getByText("Progressni yuklab bo'lmadi.")).toBeInTheDocument());
   });
 });

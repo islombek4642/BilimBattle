@@ -16,21 +16,43 @@ export function ProfileScreen() {
   const { user, token } = useAuth();
   const { navigate } = useNavigation();
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [profileError, setProfileError] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [catalog, setCatalog] = useState<Achievement[]>([]);
   const [earned, setEarned] = useState<EarnedAchievement[]>([]);
 
   useEffect(() => {
     if (!token) return;
+    let cancelled = false;
 
-    getProfile(token).then(setProfile).catch(() => {});
-    getMyStats(token).then(setStats).catch(() => {});
+    getProfile(token)
+      .then((res) => {
+        if (cancelled) return;
+        setProfile(res);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProfileError(true);
+      });
+
+    getMyStats(token)
+      .then((res) => {
+        if (cancelled) return;
+        setStats(res);
+      })
+      .catch(() => {});
+
     getAchievements(token)
       .then((res) => {
+        if (cancelled) return;
         setCatalog(res.catalog);
         setEarned(res.earned);
       })
       .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   if (!user) return null;
@@ -52,6 +74,10 @@ export function ProfileScreen() {
         </div>
         {profile && <MasteryBadge rank={profile.masteryRank} />}
       </div>
+
+      {profileError && !profile && (
+        <p className="text-center text-sm text-ios-red">Progressni yuklab bo'lmadi.</p>
+      )}
 
       {profile && (
         <div className="flex items-stretch rounded-2xl bg-ios-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
