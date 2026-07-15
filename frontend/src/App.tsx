@@ -13,6 +13,7 @@ import { ResultScreen } from './screens/ResultScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { AchievementsScreen } from './screens/AchievementsScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
 import { AdminScreen } from './screens/AdminScreen';
 import { readyWebApp, getStartParam } from './telegram/webApp';
 
@@ -45,6 +46,8 @@ function Router() {
       return <SettingsScreen />;
     case 'achievements':
       return <AchievementsScreen />;
+    case 'profile':
+      return <ProfileScreen />;
     case 'admin':
       return <AdminScreen />;
     default: {

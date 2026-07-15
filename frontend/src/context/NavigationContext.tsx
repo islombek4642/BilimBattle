@@ -12,6 +12,7 @@ export type Screen =
   | { name: 'leaderboard' }
   | { name: 'settings' }
   | { name: 'achievements' }
+  | { name: 'profile' }
   | { name: 'admin' };
 
 interface NavigationContextValue {
