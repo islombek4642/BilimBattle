@@ -6,6 +6,7 @@ import { leaderboardRouter } from './leaderboard/leaderboardRoutes';
 import { statsRouter } from './stats/statsRoutes';
 import { levelProgressRouter } from './game/levelProgressRoutes';
 import { achievementsRouter } from './achievements/achievementsRoutes';
+import { profileRouter } from './progression/profileRoutes';
 import { adminRouter } from './admin/adminRoutes';
 import { adminApiRouter } from './admin/adminApiRoutes';
 import { avatarRouter } from './users/avatarRoutes';
@@ -26,6 +27,7 @@ export function createApp() {
   app.use('/api', statsRouter);
   app.use('/api', levelProgressRouter);
   app.use('/api', achievementsRouter);
+  app.use('/api', profileRouter);
   app.use('/api', adminApiRouter);
   app.use('/api', avatarRouter);
   return app;
