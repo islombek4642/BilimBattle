@@ -29,19 +29,17 @@ describe('SettingsScreen', () => {
     localStorage.clear();
   });
 
-  it('shows the profile card with name, username, and headline stats', async () => {
+  it('shows a "Mening profilim" entry point and navigates to the profile screen when clicked', async () => {
     vi.spyOn(statsApi, 'getMyStats').mockResolvedValue({
       gamesPlayed: 10, gamesWon: 6, winRate: 60, currentStreak: 2, bestStreak: 4, rating: 1080,
     });
 
     render(<SettingsScreen />);
 
-    await waitFor(() => expect(screen.getByText('Aziz')).toBeInTheDocument());
-    expect(screen.getByText('@aziz_handle')).toBeInTheDocument();
-    expect(screen.getByText('O\'yinlar')).toBeInTheDocument();
-    expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.getByText('Reyting')).toBeInTheDocument();
-    expect(screen.getByText('1080')).toBeInTheDocument();
+    const button = await screen.findByText('Mening profilim');
+    fireEvent.click(button);
+
+    expect(navigate).toHaveBeenCalledWith({ name: 'profile' });
   });
 
   it('loads and displays the detailed stat rows', async () => {

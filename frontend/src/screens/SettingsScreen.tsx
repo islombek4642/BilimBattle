@@ -77,25 +77,15 @@ export function SettingsScreen() {
     <div className="flex flex-col gap-4 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
       <h2 className="text-lg font-bold text-ios-label">Sozlamalar</h2>
 
-      <div className="flex flex-col items-center gap-3 rounded-2xl bg-ios-card p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
-        <BattleAvatar telegramId={user?.telegramId ?? null} size={72} />
-        <div className="text-center">
-          <p className="font-bold text-ios-label">{user?.firstName}</p>
-          {user?.username && <p className="text-sm text-ios-secondary-label">@{user.username}</p>}
-        </div>
-
-        <div className="mt-1 flex w-full items-stretch border-t border-ios-divider pt-3">
-          <div className="flex flex-1 flex-col items-center gap-0.5">
-            <span className="text-lg font-bold tabular-nums text-ios-label">{stats.gamesPlayed}</span>
-            <span className="text-xs text-ios-secondary-label">O'yinlar</span>
-          </div>
-          <div className="w-px bg-ios-divider" />
-          <div className="flex flex-1 flex-col items-center gap-0.5">
-            <span className="text-lg font-bold tabular-nums text-ios-blue">{stats.rating}</span>
-            <span className="text-xs text-ios-secondary-label">Reyting</span>
-          </div>
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={() => navigate({ name: 'profile' })}
+        className="flex items-center gap-3 rounded-2xl bg-ios-card p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]"
+      >
+        <BattleAvatar telegramId={user?.telegramId ?? null} size={48} />
+        <span className="flex-1 font-medium text-ios-label">Mening profilim</span>
+        <CaretRight size={16} className="text-ios-secondary-label" />
+      </button>
 
       <div className="flex flex-col rounded-2xl bg-ios-card px-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
         <SettingsRow
