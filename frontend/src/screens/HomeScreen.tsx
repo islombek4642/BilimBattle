@@ -30,7 +30,7 @@ export function HomeScreen() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
 
-  // Four independent fetches, none blocking the others - each section of
+  // Five independent fetches, none blocking the others - each section of
   // this screen degrades gracefully (simply doesn't render) if its own
   // fetch is still pending or fails, rather than the whole screen waiting
   // on the slowest one or crashing on one failure. Unlike LevelSelectScreen/
