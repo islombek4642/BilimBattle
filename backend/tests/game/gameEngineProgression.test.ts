@@ -2,9 +2,11 @@ import { pool } from '../../src/config/db';
 import { closeRedis } from '../../src/config/redis';
 import { setIOForTesting } from '../../src/socket/socketServer';
 import { startGame, submitAnswer } from '../../src/game/gameEngine';
+import { getGame } from '../../src/game/gameState';
 import { upsertUser } from '../../src/users/userRepository';
 import { randomUUID } from 'crypto';
 import * as questionRepository from '../../src/questions/questionRepository';
+import * as xpRepository from '../../src/progression/xpRepository';
 import { getSubjectProgress } from '../../src/progression/xpRepository';
 import { getTodayProgress } from '../../src/progression/dailyProgressRepository';
 
@@ -165,5 +167,65 @@ describe('gameEngine progression integration', () => {
     expect(progress).toEqual({ xp: 0, masteryPoints: 0 });
 
     getRandomQuestionsSpy.mockRestore();
+  });
+
+  it("keeps player2's progression update and still completes match cleanup when player1's progression update throws", async () => {
+    const gameId = randomUUID();
+    const { fakeIO } = createFakeIO();
+    setIOForTesting(fakeIO as any);
+
+    const fixtureQuestions = [{ id: 910500, text: 'Q0', options: ['a', 'b'], correctIndex: 0, cefrLevel: 'A1' }];
+    const getQuestionsForLevelSpy = jest
+      .spyOn(questionRepository, 'getQuestionsForLevel')
+      .mockResolvedValueOnce(fixtureQuestions as any);
+
+    // Simulate exactly the risk progressionService.ts's per-player try/catch
+    // is meant to guard against: player1's addSubjectProgress call rejects
+    // (standing in for recordDailyActivity's documented "throws for a bad
+    // userId" behavior), while player2's call goes through normally via the
+    // real implementation.
+    const originalAddSubjectProgress = xpRepository.addSubjectProgress;
+    const addSubjectProgressSpy = jest
+      .spyOn(xpRepository, 'addSubjectProgress')
+      .mockImplementation((userId, category, xpDelta, masteryPointsDelta) => {
+        if (userId === player1Id) {
+          return Promise.reject(new Error('simulated progression failure for player1'));
+        }
+        return originalAddSubjectProgress(userId, category, xpDelta, masteryPointsDelta);
+      });
+
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await startGame(gameId, 'ingliz_tili', { userId: player1Id, socketId: 'sock1' }, { userId: player2Id, socketId: 'sock2' }, undefined, 81);
+
+    // Both answer correctly - only player1's write is made to fail.
+    await submitAnswer(gameId, player1Id, 0, 0);
+    await submitAnswer(gameId, player2Id, 0, 0);
+
+    // The match still finished cleanly: finishGame's cleanup (timer teardown,
+    // clearSocketGameId, deleteGame) ran to completion despite player1's
+    // progression update throwing partway through the loop.
+    const gameAfter = await getGame(gameId);
+    expect(gameAfter).toBeNull();
+
+    // Player2's update was NOT skipped just because player1's update threw
+    // first in the same loop - this is the actual behavior the per-player
+    // try/catch exists to guarantee.
+    const progress2 = await getSubjectProgress(player2Id, 'ingliz_tili');
+    expect(progress2.masteryPoints).toBe(1);
+    expect(progress2.xp).toBeGreaterThan(0);
+
+    // The failure was logged with enough context to identify it, not
+    // silently swallowed with no trace (same discipline persistMatchResult's
+    // failure path is tested for elsewhere in gameEngine.test.ts).
+    const failureLog = errorSpy.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('updateProgressionForRealPlayers FAILED')
+    );
+    expect(failureLog).toBeDefined();
+    expect(failureLog![0]).toContain(String(player1Id));
+
+    getQuestionsForLevelSpy.mockRestore();
+    addSubjectProgressSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 });
