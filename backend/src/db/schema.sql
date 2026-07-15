@@ -77,6 +77,41 @@ CREATE TABLE IF NOT EXISTS user_achievements (
   PRIMARY KEY (user_id, achievement_key)
 );
 
+-- One row per (user, category) - only 'ingliz_tili' is populated in this
+-- first version (see the design spec's Scope section). xp only ever grows
+-- (both a win and a loss add points); mastery_points only grows from
+-- correct answers, weighted by the question's CEFR difficulty tier.
+CREATE TABLE IF NOT EXISTS subject_xp (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  category TEXT NOT NULL,
+  xp INTEGER NOT NULL DEFAULT 0,
+  mastery_points INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, category)
+);
+
+-- One row per (user, calendar day). Keying by quest_date instead of storing
+-- a single mutable "today" row per user is what makes Daily Quest reset
+-- "lazy" (see the design spec) - a new calendar day simply has no row yet,
+-- so every counter naturally reads back as zero via getTodayProgress's
+-- COALESCE-to-zero, with no explicit reset step required anywhere.
+CREATE TABLE IF NOT EXISTS daily_quest_progress (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  quest_date DATE NOT NULL,
+  matches_played INTEGER NOT NULL DEFAULT 0,
+  correct_answers INTEGER NOT NULL DEFAULT 0,
+  best_stars_today SMALLINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, quest_date)
+);
+
+-- Daily-activity streak (distinct from users.current_streak, which counts
+-- consecutive match WINS, not consecutive days with any activity). Nullable
+-- date columns since a brand new user has never been active nor spent a
+-- freeze yet.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_streak INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS best_daily_streak INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_date DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS streak_freeze_used_at DATE;
+
 CREATE INDEX IF NOT EXISTS idx_questions_category_id ON questions(category, id);
 -- idx_questions_category (category) is now redundant: the composite
 -- idx_questions_category_id (category, id) already satisfies any query the
