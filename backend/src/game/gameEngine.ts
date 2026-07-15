@@ -6,6 +6,7 @@ import { recordMatchResult, getUserById } from '../users/userRepository';
 import { env } from '../config/env';
 import { calculateLevelStars, upsertLevelProgress } from './levelProgress';
 import { checkAndAwardMatchAchievements, checkAndAwardLevelAchievements } from '../achievements/achievements';
+import { updateProgressionForRealPlayers } from '../progression/progressionService';
 
 export interface PlayerInfo {
   userId: number;
@@ -313,6 +314,7 @@ async function finishGame(gameId: string, opts?: { knockout?: boolean }): Promis
   });
 
   await awardMatchAchievementsForRealPlayers(game.players);
+  await updateProgressionForRealPlayers(game);
 
   const timer = activeTimers.get(gameId);
   if (timer) clearTimeout(timer);
@@ -483,6 +485,7 @@ async function forfeitIfStillDisconnected(gameId: string, userId: number, versio
   });
 
   await awardMatchAchievementsForRealPlayers(game.players);
+  await updateProgressionForRealPlayers(game);
 
   clearSocketGameId(game.players);
   await deleteGame(gameId);

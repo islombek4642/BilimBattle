@@ -95,6 +95,15 @@ describe('gameEngine full match flow', () => {
 
   afterAll(async () => {
     await pool.query(`DELETE FROM matches WHERE player1_id = $1 OR player2_id = $1`, [player1Id]);
+    // This suite plays several real ingliz_tili level matches (see the
+    // level-mode tests below), which now also write subject_xp/
+    // daily_quest_progress rows via gameEngine.ts's
+    // updateProgressionForRealPlayers call (Task 6) - must be cleared
+    // before the final DELETE FROM users below, or that DELETE trips
+    // subject_xp_user_id_fkey (same class of issue user_achievements
+    // cleanup already handles elsewhere in this file).
+    await pool.query(`DELETE FROM subject_xp WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
+    await pool.query(`DELETE FROM daily_quest_progress WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
     await pool.query(`DELETE FROM users WHERE telegram_id IN (7001, 7002)`);
     await pool.end();
     await closeRedis();
