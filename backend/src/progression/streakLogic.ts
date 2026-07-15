@@ -23,6 +23,13 @@ export function mostRecentMonday(date: Date): Date {
   return d;
 }
 
+// Whether a streak-freeze is available to spend: either none has ever been
+// used, or the most recent use was in a prior week (before this week's
+// Monday) - freezes replenish weekly.
+export function isFreezeAvailable(referenceDate: Date, streakFreezeUsedAt: Date | null): boolean {
+  return !streakFreezeUsedAt || daysBetween(mostRecentMonday(referenceDate), streakFreezeUsedAt) > 0;
+}
+
 export interface StreakState {
   dailyStreak: number;
   bestDailyStreak: number;
@@ -57,8 +64,7 @@ export function computeStreakUpdate(today: Date, current: StreakState): StreakUp
     };
   }
 
-  const freezeAvailable =
-    !current.streakFreezeUsedAt || daysBetween(mostRecentMonday(today), current.streakFreezeUsedAt) > 0;
+  const freezeAvailable = isFreezeAvailable(today, current.streakFreezeUsedAt);
   if (gap === 2 && freezeAvailable) {
     const newStreak = current.dailyStreak + 1;
     return {

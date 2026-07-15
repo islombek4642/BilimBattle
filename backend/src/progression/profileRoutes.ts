@@ -6,7 +6,7 @@ import { getSubjectProgress } from './xpRepository';
 import { masteryRankForPoints } from './masteryTiers';
 import { DAILY_QUESTS } from './dailyQuests';
 import { getTodayProgress } from './dailyProgressRepository';
-import { mostRecentMonday } from './streakLogic';
+import { isFreezeAvailable } from './streakLogic';
 
 export const profileRouter = Router();
 
@@ -19,8 +19,10 @@ profileRouter.get('/profile', requireAuth, async (req: AuthenticatedRequest, res
     return;
   }
 
-  const subjectProgress = await getSubjectProgress(user.id, TRACKED_CATEGORY);
-  const todayProgress = await getTodayProgress(user.id);
+  const [subjectProgress, todayProgress] = await Promise.all([
+    getSubjectProgress(user.id, TRACKED_CATEGORY),
+    getTodayProgress(user.id),
+  ]);
   const dailyQuests = DAILY_QUESTS.map((quest) => {
     const progress = todayProgress[quest.metric];
     return {
@@ -32,8 +34,10 @@ profileRouter.get('/profile', requireAuth, async (req: AuthenticatedRequest, res
     };
   });
 
-  const freezeAvailable =
-    !user.streakFreezeUsedAt || mostRecentMonday(new Date()) > new Date(user.streakFreezeUsedAt);
+  const freezeAvailable = isFreezeAvailable(
+    new Date(),
+    user.streakFreezeUsedAt ? new Date(user.streakFreezeUsedAt) : null
+  );
 
   res.json({
     xp: subjectProgress.xp,

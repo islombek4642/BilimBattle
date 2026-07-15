@@ -1,4 +1,4 @@
-import { computeStreakUpdate, mostRecentMonday } from '../../src/progression/streakLogic';
+import { computeStreakUpdate, mostRecentMonday, isFreezeAvailable } from '../../src/progression/streakLogic';
 
 const DAY = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d));
 
@@ -79,5 +79,22 @@ describe('mostRecentMonday', () => {
 
   it('returns the preceding Monday for a Sunday', () => {
     expect(mostRecentMonday(DAY(2026, 7, 19))).toEqual(DAY(2026, 7, 13));
+  });
+});
+
+describe('isFreezeAvailable', () => {
+  it('is available when no freeze has ever been used', () => {
+    expect(isFreezeAvailable(DAY(2026, 7, 15), null)).toBe(true);
+  });
+
+  it('is available when the freeze was used earlier in a previous week', () => {
+    // 2026-07-16 is a Thursday, so this week's Monday is 2026-07-13; a
+    // freeze used on 2026-07-09 (the previous week) is before that boundary.
+    expect(isFreezeAvailable(DAY(2026, 7, 16), DAY(2026, 7, 9))).toBe(true);
+  });
+
+  it('is not available when the freeze was used this week (on or after this week\'s Monday)', () => {
+    expect(isFreezeAvailable(DAY(2026, 7, 16), DAY(2026, 7, 13))).toBe(false);
+    expect(isFreezeAvailable(DAY(2026, 7, 16), DAY(2026, 7, 15))).toBe(false);
   });
 });
