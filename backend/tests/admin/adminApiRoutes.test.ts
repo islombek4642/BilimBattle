@@ -1,4 +1,9 @@
 process.env.ADMIN_TELEGRAM_ID = '9999';
+// Must be set before importing ../../src/config/env (see
+// adminAuth.test.ts's identical comment) - exercises the process-week
+// route's cron-facing Basic Auth path alongside its existing Bearer-JWT
+// path.
+process.env.ADMIN_PASSWORD = 'league-cron-test-secret';
 
 import express from 'express';
 import request from 'supertest';
@@ -76,6 +81,21 @@ describe('POST /api/admin/league/process-week', () => {
       .post('/api/admin/league/process-week')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
+  });
+
+  it('rejects a request with an incorrect Basic Auth password and no Bearer token', async () => {
+    const res = await request(app)
+      .post('/api/admin/league/process-week')
+      .set('Authorization', `Basic ${Buffer.from('admin:wrong-password').toString('base64')}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('accepts the host-crontab-style Basic Auth credential (no Telegram session) - the trigger a real crontab entry would use', async () => {
+    const res = await request(app)
+      .post('/api/admin/league/process-week')
+      .set('Authorization', `Basic ${Buffer.from('admin:league-cron-test-secret').toString('base64')}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('alreadyProcessed');
   });
 
   it("promotes and relegates users within a tier based on last week's XP, then marks the week processed", async () => {

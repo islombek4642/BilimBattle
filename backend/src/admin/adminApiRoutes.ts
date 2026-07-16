@@ -3,6 +3,7 @@ import multer from 'multer';
 import mammoth from 'mammoth';
 import { requireAuth, AuthenticatedRequest } from '../auth/authMiddleware';
 import { env } from '../config/env';
+import { safeEqual } from './adminAuth';
 import { getAdminSummary, getDailyStats, getUserList } from './statsQueries';
 import { getCategoryByKey, createCategory, insertQuestions } from '../questions/questionRepository';
 import { parseQuestionsText } from '../questions/docxQuestionParser';
@@ -130,10 +131,35 @@ adminApiRouter.post(
   }
 );
 
+// The host crontab that triggers this endpoint has no Telegram session to
+// present a Bearer JWT with, so it authenticates the same way the
+// standalone /admin/stats HTML dashboard does: HTTP Basic Auth checked
+// against ADMIN_PASSWORD (see adminAuth.ts's requireAdminAuth). A request
+// presenting valid Basic Auth skips requireAuth/requireAdmin entirely;
+// anything else falls through to the normal Telegram-JWT admin gate, so a
+// logged-in admin can still trigger this manually from the Mini App/a
+// Bearer-token client exactly as before.
+function isValidCronBasicAuth(req: Request): boolean {
+  if (!env.adminPassword) return false;
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Basic ')) return false;
+  const decoded = Buffer.from(authHeader.slice('Basic '.length), 'base64').toString('utf-8');
+  const separatorIndex = decoded.indexOf(':');
+  const password = separatorIndex === -1 ? '' : decoded.slice(separatorIndex + 1);
+  return Boolean(password) && safeEqual(password, env.adminPassword);
+}
+
+function requireProcessWeekAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+  if (isValidCronBasicAuth(req)) {
+    next();
+    return;
+  }
+  requireAuth(req, res, () => requireAdmin(req, res, next));
+}
+
 adminApiRouter.post(
   '/admin/league/process-week',
-  requireAuth,
-  requireAdmin,
+  requireProcessWeekAuth,
   async (_req: AuthenticatedRequest, res: Response) => {
     const weekStartDate = previousWeekStartDateString(new Date());
 
