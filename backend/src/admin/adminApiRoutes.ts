@@ -6,6 +6,14 @@ import { env } from '../config/env';
 import { getAdminSummary, getDailyStats, getUserList } from './statsQueries';
 import { getCategoryByKey, createCategory, insertQuestions } from '../questions/questionRepository';
 import { parseQuestionsText } from '../questions/docxQuestionParser';
+import { LEAGUE_TIERS, computeTierChanges } from '../league/leagueTiers';
+import {
+  getFullBracket,
+  applyTierChange,
+  isWeekProcessed,
+  markWeekProcessed,
+  previousWeekStartDateString,
+} from '../league/leagueRepository';
 
 export const adminApiRouter = Router();
 
@@ -119,5 +127,30 @@ adminApiRouter.post(
     }
 
     res.json({ category: resolvedCategory, inserted: questions.length, errors });
+  }
+);
+
+adminApiRouter.post(
+  '/admin/league/process-week',
+  requireAuth,
+  requireAdmin,
+  async (_req: AuthenticatedRequest, res: Response) => {
+    const weekStartDate = previousWeekStartDateString(new Date());
+
+    if (await isWeekProcessed(weekStartDate)) {
+      res.json({ alreadyProcessed: true, weekStartDate });
+      return;
+    }
+
+    for (const tier of LEAGUE_TIERS) {
+      const members = await getFullBracket(tier, weekStartDate);
+      const changes = computeTierChanges(tier, members);
+      for (const change of changes) {
+        await applyTierChange(change.userId, change.newTier);
+      }
+    }
+
+    await markWeekProcessed(weekStartDate);
+    res.json({ alreadyProcessed: false, weekStartDate });
   }
 );
