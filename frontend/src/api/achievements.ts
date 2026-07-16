@@ -6,6 +6,7 @@ export interface Achievement {
   category: 'games' | 'streak' | 'rating' | 'level';
   label: string;
   description: string;
+  xpReward: number;
 }
 
 export interface EarnedAchievement {

@@ -98,6 +98,7 @@ export function AchievementsScreen() {
                     )}
                     <span className="text-sm font-semibold text-ios-label">{achievement.label}</span>
                     <span className="text-xs text-ios-secondary-label">{achievement.description}</span>
+                    <span className="text-xs font-semibold text-ios-gold">+{achievement.xpReward} XP</span>
                   </div>
                 );
               })}

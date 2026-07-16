@@ -15,7 +15,7 @@ describe('AchievementsScreen', () => {
 
   it('shows a loading state, then renders catalog entries once loaded', async () => {
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
-      catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: "1 ta o'yin o'ynang" }],
+      catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: "1 ta o'yin o'ynang", xpReward: 50 }],
       earned: [],
     });
 
@@ -28,8 +28,8 @@ describe('AchievementsScreen', () => {
   it('shows an earned achievement as unlocked and an unearned one as locked', async () => {
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
       catalog: [
-        { key: 'games_1', category: 'games', label: 'Birinchi qadam', description: "1 ta o'yin o'ynang" },
-        { key: 'games_10', category: 'games', label: "Faol o'yinchi", description: "10 ta o'yin o'ynang" },
+        { key: 'games_1', category: 'games', label: 'Birinchi qadam', description: "1 ta o'yin o'ynang", xpReward: 50 },
+        { key: 'games_10', category: 'games', label: "Faol o'yinchi", description: "10 ta o'yin o'ynang", xpReward: 100 },
       ],
       earned: [{ key: 'games_1', earnedAt: '2026-07-14T00:00:00.000Z' }],
     });
@@ -46,8 +46,8 @@ describe('AchievementsScreen', () => {
   it('groups achievements by category with a visible category heading', async () => {
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
       catalog: [
-        { key: 'games_1', category: 'games', label: 'Birinchi qadam', description: '...' },
-        { key: 'streak_3', category: 'streak', label: 'Olov', description: '...' },
+        { key: 'games_1', category: 'games', label: 'Birinchi qadam', description: '...', xpReward: 50 },
+        { key: 'streak_3', category: 'streak', label: 'Olov', description: '...', xpReward: 50 },
       ],
       earned: [],
     });
@@ -55,6 +55,20 @@ describe('AchievementsScreen', () => {
     render(<AchievementsScreen />);
     await screen.findByText('Faollik');
     expect(screen.getAllByText('Olov').length).toBeGreaterThan(0);
+  });
+
+  it('shows the XP reward on each achievement card', async () => {
+    vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
+      catalog: [
+        { key: 'games_1', category: 'games', label: 'Birinchi qadam', description: "1 ta o'yin o'ynang", xpReward: 50 },
+      ],
+      earned: [],
+    });
+
+    render(<AchievementsScreen />);
+    await screen.findByText('Birinchi qadam');
+
+    expect(screen.getByText('+50 XP')).toBeInTheDocument();
   });
 
   it('shows an error message if loading fails', async () => {

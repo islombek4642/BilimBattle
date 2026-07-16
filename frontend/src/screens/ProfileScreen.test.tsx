@@ -57,7 +57,7 @@ describe('ProfileScreen', () => {
 
   it('shows recently earned achievements and navigates to the full list when clicked', async () => {
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
-      catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: "1 ta o'yin o'ynang" }],
+      catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: "1 ta o'yin o'ynang", xpReward: 50 }],
       earned: [{ key: 'games_1', earnedAt: '2026-07-14T00:00:00.000Z' }],
     });
 

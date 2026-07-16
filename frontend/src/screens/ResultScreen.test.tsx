@@ -264,7 +264,7 @@ describe('ResultScreen', () => {
   it('shows a "Yangi nishon!" banner when a newly earned achievement is detected after the match', async () => {
     localStorage.clear();
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
-      catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: '...' }],
+      catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: '...', xpReward: 50 }],
       earned: [{ key: 'games_1', earnedAt: '2026-07-14T00:00:00.000Z' }],
     });
 
@@ -276,7 +276,7 @@ describe('ResultScreen', () => {
   it('shows the achievement banner in the level-complete branch too', async () => {
     localStorage.clear();
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
-      catalog: [{ key: 'level_10', category: 'level', label: 'Bosqichlar ustasi I', description: '...' }],
+      catalog: [{ key: 'level_10', category: 'level', label: 'Bosqichlar ustasi I', description: '...', xpReward: 200 }],
       earned: [{ key: 'level_10', earnedAt: '2026-07-14T00:00:00.000Z' }],
     });
 
@@ -298,7 +298,7 @@ describe('ResultScreen', () => {
   it('does not re-show a banner for an achievement already seen on a previous visit', async () => {
     localStorage.setItem('bilimbattle:seenAchievements', JSON.stringify(['games_1']));
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
-      catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: '...' }],
+      catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: '...', xpReward: 50 }],
       earned: [{ key: 'games_1', earnedAt: '2026-07-14T00:00:00.000Z' }],
     });
 
