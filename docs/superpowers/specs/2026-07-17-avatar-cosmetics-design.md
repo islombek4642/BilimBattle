@@ -26,7 +26,7 @@ Liga ramkasini shu yerlarga qo'shish ikki muammoni keltirib chiqaradi: (1) mavju
 | Oltin | `border-ios-gold` | mavjud token qayta ishlatiladi |
 | Platina | `border-league-platinum` | YANGI token, `#7FDBDA` (auditning 7.1-qismida taklif qilingan qiymat) |
 | Olmos | `border-league-diamond` | YANGI token, `#B983FF` (auditning 7.1-qismida taklif qilingan qiymat) |
-| Usta | `border-league-master` | YANGI token, `#E63946` (to'q qizil — Olmosdan keyingi, Chempiondan oldingi bosqich) |
+| Usta | `border-league-master` | YANGI token, `#C026D3` (to'q fuksiya/magenta — Olmosdan keyingi, Chempiondan oldingi bosqich; dastlab tanlangan to'q qizil `#E63946` mavjud `--color-ios-red` (#ff3b30)ga juda yaqin bo'lib chiqdi — kod ko'rikida topildi va almashtirildi, chunki bu ranglar avatar ramkasi hajmida "raqib/xato" belgisi bilan chalkashib ketishi mumkin edi) |
 | Chempion | `border-ios-gold` + porlash (`shadow-[0_0_12px_rgba(255,192,46,0.6)]`) | Oltin bilan BIR XIL rang, lekin porlaydi — `MasteryBadge`ning "Professor" darajasidagi xuddi shu naqsh (`shadow-[0_0_12px_rgba(255,192,46,0.5)]`) qayta ishlatiladi, eng yuqori bosqich "oltindan ham porloqroq" degan ma'noni beradi |
 
 `frontend/src/index.css`ga 2 ta yangi CSS custom property qo'shiladi: `--color-league-platinum: #7FDBDA;` va `--color-league-diamond: #B983FF;` va `--color-league-master: #E63946;` (Tailwind v4 bu qiymatlardan avtomatik `border-league-platinum` va h.k. utility klasslarini generatsiya qiladi, xuddi mavjud `--color-ios-*` tokenlar kabi).

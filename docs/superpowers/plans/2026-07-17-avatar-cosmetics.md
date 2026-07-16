@@ -71,7 +71,7 @@ with:
      (see leagueTierStyle.ts). */
   --color-league-platinum: #7fdbda;
   --color-league-diamond: #b983ff;
-  --color-league-master: #e63946;
+  --color-league-master: #c026d3;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 ```
 
