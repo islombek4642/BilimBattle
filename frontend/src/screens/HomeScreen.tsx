@@ -7,6 +7,7 @@ import { useGameSocketContext } from '../context/GameSocketContext';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
 import { BattleAvatar } from '../components/BattleAvatar';
+import { MasteryBadge } from '../components/MasteryBadge';
 import { getMyStats } from '../api/stats';
 import { getAchievements, Achievement, EarnedAchievement } from '../api/achievements';
 import { getLevelProgress } from '../api/levelProgress';
@@ -15,6 +16,7 @@ import { getProfile, ProfileResponse } from '../api/profile';
 import { getMyLeague, LeagueResponse } from '../api/league';
 import { findNextLevelToPlay } from '../utils/levelUnlock';
 import { findRank } from '../utils/leaderboardRank';
+import { leagueTierBorderClass } from '../utils/leagueTierStyle';
 import { Stats, LeaderboardEntry } from '../api/types';
 
 const ACHIEVEMENT_BADGE_LIMIT = 5;
@@ -82,7 +84,12 @@ export function HomeScreen() {
   return (
     <div className="flex min-h-full flex-col gap-5 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
       <div className="flex items-center gap-3">
-        <BattleAvatar telegramId={user.telegramId} size={44} />
+        <BattleAvatar
+          telegramId={user.telegramId}
+          size={44}
+          borderColorClass={league ? leagueTierBorderClass(league.tier) : ''}
+        />
+        {profile && <MasteryBadge rank={profile.masteryRank} />}
         {stats && (
           <div className="animate-fade-in-up ml-auto flex shrink-0 items-center gap-3">
             <span className="flex items-center gap-1 text-sm font-bold text-ios-orange">

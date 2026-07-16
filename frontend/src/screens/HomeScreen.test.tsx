@@ -73,6 +73,21 @@ describe('HomeScreen', () => {
     expect(screen.getByText('1100')).toBeInTheDocument(); // rating
   });
 
+  it('shows the league-tier avatar border and mastery title once profile and league load', async () => {
+    vi.spyOn(profileApi, 'getProfile').mockResolvedValue({
+      xp: 0, masteryPoints: 0, masteryRank: 'Usta', category: 'ingliz_tili',
+      dailyQuests: [], streak: { current: 0, best: 0, freezeAvailable: true },
+    });
+    vi.spyOn(leagueApi, 'getMyLeague').mockResolvedValue({
+      tier: 'Oltin', weeklyXp: 0, bracket: [],
+    });
+
+    render(<HomeScreen />);
+
+    await screen.findByText('Usta');
+    expect(screen.getByAltText('Foydalanuvchi rasmi')).toHaveClass('border-ios-gold');
+  });
+
   it('shows a badge row with recently earned achievements and navigates to the achievements screen when clicked', async () => {
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
       catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: "1 ta o'yin o'ynang", xpReward: 50 }],
