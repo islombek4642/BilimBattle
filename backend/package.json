@@ -24,6 +24,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "hyparquet": "^1.26.2",
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
@@ -31,6 +32,7 @@
     "multer": "^2.2.0",
     "node-telegram-bot-api": "^1.1.2",
     "pg": "^8.22.0",
+    "rate-limit-redis": "^5.0.0",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
