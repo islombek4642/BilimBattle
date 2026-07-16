@@ -142,12 +142,21 @@ adminApiRouter.post(
       return;
     }
 
+    // Compute ALL tier changes for every tier FIRST, against a consistent
+    // snapshot, before applying ANY of them. getFullBracket filters by the
+    // user's CURRENT tier - applying a change mid-loop would let an
+    // already-promoted user's row bleed into the NEXT tier's bracket
+    // computation within this same run (using XP earned while still in
+    // their old tier), letting them cascade upward multiple tiers in one
+    // pass instead of exactly one, as the design intends.
+    const allChanges: { userId: number; newTier: (typeof LEAGUE_TIERS)[number] }[] = [];
     for (const tier of LEAGUE_TIERS) {
       const members = await getFullBracket(tier, weekStartDate);
-      const changes = computeTierChanges(tier, members);
-      for (const change of changes) {
-        await applyTierChange(change.userId, change.newTier);
-      }
+      allChanges.push(...computeTierChanges(tier, members));
+    }
+
+    for (const change of allChanges) {
+      await applyTierChange(change.userId, change.newTier);
     }
 
     await markWeekProcessed(weekStartDate);
