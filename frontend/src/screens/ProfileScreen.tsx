@@ -6,9 +6,11 @@ import { useNavigation } from '../context/NavigationContext';
 import { getProfile, ProfileResponse } from '../api/profile';
 import { getMyStats } from '../api/stats';
 import { getAchievements, Achievement, EarnedAchievement } from '../api/achievements';
+import { getMyLeague, LeagueResponse } from '../api/league';
 import { Stats } from '../api/types';
 import { BattleAvatar } from '../components/BattleAvatar';
 import { MasteryBadge } from '../components/MasteryBadge';
+import { leagueTierBorderClass } from '../utils/leagueTierStyle';
 
 const RECENT_ACHIEVEMENT_LIMIT = 3;
 
@@ -20,6 +22,7 @@ export function ProfileScreen() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [catalog, setCatalog] = useState<Achievement[]>([]);
   const [earned, setEarned] = useState<EarnedAchievement[]>([]);
+  const [league, setLeague] = useState<LeagueResponse | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -50,6 +53,13 @@ export function ProfileScreen() {
       })
       .catch(() => {});
 
+    getMyLeague(token)
+      .then((res) => {
+        if (cancelled) return;
+        setLeague(res);
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
@@ -67,7 +77,11 @@ export function ProfileScreen() {
       <h2 className="text-lg font-bold text-ios-label">Mening profilim</h2>
 
       <div className="flex flex-col items-center gap-3 rounded-2xl bg-ios-card p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
-        <BattleAvatar telegramId={user.telegramId} size={72} />
+        <BattleAvatar
+          telegramId={user.telegramId}
+          size={72}
+          borderColorClass={league ? leagueTierBorderClass(league.tier) : ''}
+        />
         <div className="text-center">
           <p className="font-bold text-ios-label">{user.firstName}</p>
           {user.username && <p className="text-sm text-ios-secondary-label">@{user.username}</p>}

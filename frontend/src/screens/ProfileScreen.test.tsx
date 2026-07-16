@@ -6,6 +6,7 @@ import * as navigationContext from '../context/NavigationContext';
 import * as profileApi from '../api/profile';
 import * as statsApi from '../api/stats';
 import * as achievementsApi from '../api/achievements';
+import * as leagueApi from '../api/league';
 
 describe('ProfileScreen', () => {
   const navigate = vi.fn();
@@ -32,6 +33,9 @@ describe('ProfileScreen', () => {
       gamesPlayed: 12, gamesWon: 7, winRate: 58, currentStreak: 2, bestStreak: 5, rating: 1120,
     });
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({ catalog: [], earned: [] });
+    vi.spyOn(leagueApi, 'getMyLeague').mockResolvedValue({
+      tier: 'Bronza', weeklyXp: 0, bracket: [],
+    });
   });
 
   it('renders nothing while the user is not yet loaded', () => {
@@ -47,6 +51,17 @@ describe('ProfileScreen', () => {
     await screen.findByText('340');
     expect(screen.getByText("Boshlang'ich")).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
+  });
+
+  it("applies the league-tier border color to the main avatar once the league loads", async () => {
+    vi.spyOn(leagueApi, 'getMyLeague').mockResolvedValue({
+      tier: 'Oltin', weeklyXp: 120, bracket: [],
+    });
+
+    render(<ProfileScreen />);
+    await screen.findByText('340');
+
+    expect(screen.getByAltText('Foydalanuvchi rasmi')).toHaveClass('border-ios-gold');
   });
 
   it("shows the user's overall stats once loaded", async () => {
