@@ -287,13 +287,21 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     // off as a promise chain terminated in .catch() instead, so a rejection
     // out of handleReconnect can't take down the process.
     socket.on('reconnect_game', ({ gameId }: { gameId: string }, ack: (state: unknown) => void) => {
-      if (isThrottled(socket.id, 'reconnect_game', RECONNECT_THROTTLE.max, RECONNECT_THROTTLE.windowMs)) return;
       // A client that emits this event with no ack callback (buggy client,
       // or an old client build) would otherwise crash this handler on
       // `ack(...)` below ("ack is not a function") - there's no global
       // unhandledRejection handler in this backend, so that's a real
       // process-crash vector, not just a logged error.
       if (typeof ack !== 'function') return;
+
+      // Throttled callers still get an ack (mirroring the "game not found"
+      // shape below) instead of a bare `return` - the frontend's
+      // reconnectGame() promise has no timeout, so silently dropping the
+      // event here would leave it hanging forever instead of failing fast.
+      if (isThrottled(socket.id, 'reconnect_game', RECONNECT_THROTTLE.max, RECONNECT_THROTTLE.windowMs)) {
+        ack({ found: false });
+        return;
+      }
 
       // handleReconnect returns the GameState directly (or null) instead of
       // a boolean specifically so we don't need a second getGame() call here.

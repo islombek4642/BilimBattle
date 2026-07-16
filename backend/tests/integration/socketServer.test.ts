@@ -229,6 +229,43 @@ describe('socket server session handling', () => {
     });
   });
 
+  // Regression test for the fix alongside this test: reconnect_game's
+  // throttle guard used to be a bare `return` on the throttled path, which
+  // never called `ack(...)`. The frontend's reconnectGame() has no timeout
+  // on that promise, so a throttled reconnect used to hang forever instead
+  // of failing fast. RECONNECT_THROTTLE.max is 5 per second, so emitting 10
+  // rapid calls (each with its own ack) guarantees at least some are
+  // throttled - and this asserts every single one, throttled or not, still
+  // receives an ack({ found: false }) (the gameId doesn't exist, so the
+  // non-throttled calls resolve to "not found" too, same shape).
+  it('acks a throttled reconnect_game call instead of leaving it hanging', (done) => {
+    const token = signSession({ userId: 6666, telegramId: 6666 });
+    const client: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token } });
+    const acks: unknown[] = [];
+    const totalEmits = 10;
+
+    client.on('connect', () => {
+      for (let i = 0; i < totalEmits; i += 1) {
+        client.emit('reconnect_game', { gameId: 'reconnect-throttle-test-no-such-game' }, (state: unknown) => {
+          acks.push(state);
+        });
+      }
+
+      setTimeout(() => {
+        try {
+          expect(acks.length).toBe(totalEmits);
+          acks.forEach((state) => expect(state).toEqual({ found: false }));
+        } catch (err) {
+          done(err as Error);
+          return;
+        } finally {
+          client.close();
+        }
+        done();
+      }, 300);
+    });
+  });
+
   // Regression test: a user opening their own invite link (previewing it,
   // or accidentally tapping their own "share" link) used to sail straight
   // through join_invite and get matched against themselves - createMatch
