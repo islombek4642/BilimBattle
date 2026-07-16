@@ -103,6 +103,39 @@ CREATE TABLE IF NOT EXISTS daily_quest_progress (
   PRIMARY KEY (user_id, quest_date)
 );
 
+-- One row per (user, ISO week). Mirrors daily_quest_progress's "lazy reset"
+-- pattern - a new week simply has no row yet, so a fresh week's XP starts at
+-- 0 with no explicit reset step. week_start_date is always a Monday (UTC),
+-- computed the same way progression/streakLogic.ts's mostRecentMonday()
+-- already computes week boundaries for the daily-streak freeze.
+CREATE TABLE IF NOT EXISTS league_weekly_xp (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  week_start_date DATE NOT NULL,
+  xp INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, week_start_date)
+);
+
+-- A user's CURRENT league tier - persistent, only ever changed by the
+-- weekly promotion/relegation computation (see league/leagueRoutes.ts's
+-- POST /admin/league/process-week). Defaults new rows to 'Bronza' (created
+-- lazily the first time a user earns any weekly XP - see
+-- league/leagueRepository.ts's accumulateWeeklyXp).
+CREATE TABLE IF NOT EXISTS user_league (
+  user_id INTEGER NOT NULL REFERENCES users(id) PRIMARY KEY,
+  tier TEXT NOT NULL DEFAULT 'Bronza',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Idempotency marker: a row here means promotion/relegation has already run
+-- for that week. The weekly-processing endpoint checks this FIRST and
+-- no-ops if a row already exists, so an accidental duplicate trigger (e.g.
+-- a manual run plus the scheduled crontab run landing the same week) can
+-- never double-apply promotions/relegations.
+CREATE TABLE IF NOT EXISTS league_processing_log (
+  week_start_date DATE PRIMARY KEY,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Daily-activity streak (distinct from users.current_streak, which counts
 -- consecutive match WINS, not consecutive days with any activity). Nullable
 -- date columns since a brand new user has never been active nor spent a
