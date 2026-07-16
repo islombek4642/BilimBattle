@@ -18,6 +18,8 @@ describe('achievements', () => {
 
   afterEach(async () => {
     await pool.query(`DELETE FROM user_achievements WHERE user_id = $1`, [userId]);
+    await pool.query(`DELETE FROM league_weekly_xp WHERE user_id = $1`, [userId]);
+    await pool.query(`DELETE FROM user_league WHERE user_id = $1`, [userId]);
   });
 
   afterAll(async () => {
@@ -100,6 +102,29 @@ describe('achievements', () => {
       // and level 3 accidentally satisfies level_perfect's threshold.
       const newlyAwarded = await checkAndAwardLevelAchievements(userId, 3, 1);
       expect(newlyAwarded).toEqual([]);
+    });
+  });
+
+  describe('XP reward crediting', () => {
+    it('credits the weekly league XP reward for a newly-awarded achievement', async () => {
+      const { getWeeklyXp } = await import('../../src/league/leagueRepository');
+      await awardAchievements(userId, ['games_1']);
+      // games_1's xpReward is 50 (tier 1, see the design spec's reward table).
+      expect(await getWeeklyXp(userId)).toBe(50);
+    });
+
+    it('does not credit XP again when the same key is awarded a second time', async () => {
+      const { getWeeklyXp } = await import('../../src/league/leagueRepository');
+      await awardAchievements(userId, ['games_1']);
+      await awardAchievements(userId, ['games_1']);
+      expect(await getWeeklyXp(userId)).toBe(50);
+    });
+
+    it('credits the correct, differing XP amount for achievements of different tiers', async () => {
+      const { getWeeklyXp } = await import('../../src/league/leagueRepository');
+      await awardAchievements(userId, ['streak_3', 'rating_2000']);
+      // streak_3 (tier 1) = 50, rating_2000 (tier 4) = 300 -> 350 total.
+      expect(await getWeeklyXp(userId)).toBe(350);
     });
   });
 });

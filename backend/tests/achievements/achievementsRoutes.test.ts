@@ -21,6 +21,8 @@ describe('GET /api/achievements', () => {
 
   afterEach(async () => {
     await pool.query(`DELETE FROM user_achievements WHERE user_id = $1`, [userId]);
+    await pool.query(`DELETE FROM league_weekly_xp WHERE user_id = $1`, [userId]);
+    await pool.query(`DELETE FROM user_league WHERE user_id = $1`, [userId]);
   });
 
   afterAll(async () => {
