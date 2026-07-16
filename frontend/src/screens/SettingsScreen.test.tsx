@@ -5,6 +5,8 @@ import { SettingsScreen } from './SettingsScreen';
 import * as authContext from '../context/AuthContext';
 import * as navigationContext from '../context/NavigationContext';
 import * as statsApi from '../api/stats';
+import * as profileApi from '../api/profile';
+import * as leagueApi from '../api/league';
 
 describe('SettingsScreen', () => {
   const navigate = vi.fn();
@@ -40,6 +42,36 @@ describe('SettingsScreen', () => {
     fireEvent.click(button);
 
     expect(navigate).toHaveBeenCalledWith({ name: 'profile' });
+  });
+
+  it('shows the league-tier avatar border and mastery title on the "Mening profilim" entry point once loaded', async () => {
+    vi.spyOn(statsApi, 'getMyStats').mockResolvedValue({
+      gamesPlayed: 10, gamesWon: 6, winRate: 60, currentStreak: 2, bestStreak: 4, rating: 1080,
+    });
+    vi.spyOn(profileApi, 'getProfile').mockResolvedValue({
+      xp: 0, masteryPoints: 0, masteryRank: 'Yuqori', category: 'ingliz_tili',
+      dailyQuests: [], streak: { current: 0, best: 0, freezeAvailable: true },
+    });
+    vi.spyOn(leagueApi, 'getMyLeague').mockResolvedValue({
+      tier: 'Olmos', weeklyXp: 0, bracket: [],
+    });
+
+    render(<SettingsScreen />);
+
+    await screen.findByText('Yuqori');
+    expect(screen.getByAltText('Foydalanuvchi rasmi')).toHaveClass('border-league-diamond');
+  });
+
+  it('still shows the "Mening profilim" entry point normally when the profile/league fetches fail', async () => {
+    vi.spyOn(statsApi, 'getMyStats').mockResolvedValue({
+      gamesPlayed: 10, gamesWon: 6, winRate: 60, currentStreak: 2, bestStreak: 4, rating: 1080,
+    });
+    vi.spyOn(profileApi, 'getProfile').mockRejectedValue(new Error('network down'));
+    vi.spyOn(leagueApi, 'getMyLeague').mockRejectedValue(new Error('network down'));
+
+    render(<SettingsScreen />);
+
+    expect(await screen.findByText('Mening profilim')).toBeInTheDocument();
   });
 
   it('loads and displays the detailed stat rows', async () => {

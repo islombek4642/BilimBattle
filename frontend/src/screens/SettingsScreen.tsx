@@ -7,6 +7,10 @@ import { getMyStats } from '../api/stats';
 import { Stats } from '../api/types';
 import { SOUND_KEY, isSoundEnabled } from '../utils/settings';
 import { BattleAvatar } from '../components/BattleAvatar';
+import { getProfile, ProfileResponse } from '../api/profile';
+import { getMyLeague, LeagueResponse } from '../api/league';
+import { MasteryBadge } from '../components/MasteryBadge';
+import { leagueTierBorderClass } from '../utils/leagueTierStyle';
 
 export function SettingsScreen() {
   const { token, user } = useAuth();
@@ -19,6 +23,8 @@ export function SettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(isSoundEnabled);
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [league, setLeague] = useState<LeagueResponse | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -40,6 +46,25 @@ export function SettingsScreen() {
         if (cancelled) return;
         setLoading(false);
       });
+
+    // Independent of the stats fetch above (which alone gates this screen's
+    // loading/error state) - these two only decorate the "Mening profilim"
+    // avatar with a league-tier border and mastery title, so a slow or
+    // failed fetch here must never block or error out the rest of the
+    // settings screen.
+    getProfile(token)
+      .then((res) => {
+        if (cancelled) return;
+        setProfile(res);
+      })
+      .catch(() => {});
+
+    getMyLeague(token)
+      .then((res) => {
+        if (cancelled) return;
+        setLeague(res);
+      })
+      .catch(() => {});
 
     return () => {
       cancelled = true;
@@ -82,8 +107,13 @@ export function SettingsScreen() {
         onClick={() => navigate({ name: 'profile' })}
         className="flex items-center gap-3 rounded-2xl bg-ios-card p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]"
       >
-        <BattleAvatar telegramId={user?.telegramId ?? null} size={48} />
+        <BattleAvatar
+          telegramId={user?.telegramId ?? null}
+          size={48}
+          borderColorClass={league ? leagueTierBorderClass(league.tier) : ''}
+        />
         <span className="flex-1 font-medium text-ios-label">Mening profilim</span>
+        {profile && <MasteryBadge rank={profile.masteryRank} />}
         <CaretRight size={16} className="text-ios-secondary-label" />
       </button>
 
