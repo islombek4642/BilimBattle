@@ -12,6 +12,7 @@ import { getAchievements, Achievement, EarnedAchievement } from '../api/achievem
 import { getLevelProgress } from '../api/levelProgress';
 import { getGlobalLeaderboard } from '../api/leaderboard';
 import { getProfile, ProfileResponse } from '../api/profile';
+import { getMyLeague, LeagueResponse } from '../api/league';
 import { findNextLevelToPlay } from '../utils/levelUnlock';
 import { findRank } from '../utils/leaderboardRank';
 import { Stats, LeaderboardEntry } from '../api/types';
@@ -29,8 +30,9 @@ export function HomeScreen() {
   const [nextLevel, setNextLevel] = useState<number | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [league, setLeague] = useState<LeagueResponse | null>(null);
 
-  // Five independent fetches, none blocking the others - each section of
+  // Six independent fetches, none blocking the others - each section of
   // this screen degrades gracefully (simply doesn't render) if its own
   // fetch is still pending or fails, rather than the whole screen waiting
   // on the slowest one or crashing on one failure. Unlike LevelSelectScreen/
@@ -62,6 +64,8 @@ export function HomeScreen() {
       .catch(() => {});
 
     getProfile(token).then(setProfile).catch(() => {});
+
+    getMyLeague(token).then(setLeague).catch(() => {});
   }, [token]);
 
   if (!user) return null;
@@ -179,6 +183,7 @@ export function HomeScreen() {
           <span className="flex items-center gap-1 text-sm font-semibold text-ios-label">
             <Trophy size={16} weight="fill" className="text-ios-gold" />
             Top reyting
+            {league && <span className="ml-1 font-normal text-ios-secondary-label">· {league.tier} ligasi</span>}
           </span>
           {podium.map((entry, index) => (
             <div key={entry.telegramId} className="flex items-center gap-2">

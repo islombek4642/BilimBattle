@@ -10,6 +10,7 @@ import * as achievementsApi from '../api/achievements';
 import * as levelProgressApi from '../api/levelProgress';
 import * as leaderboardApi from '../api/leaderboard';
 import * as profileApi from '../api/profile';
+import * as leagueApi from '../api/league';
 
 describe('HomeScreen', () => {
   const navigate = vi.fn();
@@ -40,6 +41,9 @@ describe('HomeScreen', () => {
     vi.spyOn(profileApi, 'getProfile').mockResolvedValue({
       xp: 0, masteryPoints: 0, masteryRank: 'Boshlangich', category: 'ingliz_tili',
       dailyQuests: [], streak: { current: 0, best: 0, freezeAvailable: true },
+    });
+    vi.spyOn(leagueApi, 'getMyLeague').mockResolvedValue({
+      tier: 'Bronza', weeklyXp: 0, bracket: [],
     });
   });
 
@@ -142,6 +146,20 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
     await screen.findByText('2');
     expect(screen.queryByText('Top reyting')).not.toBeInTheDocument();
+  });
+
+  it('shows the league tier next to the leaderboard preview heading once loaded', async () => {
+    vi.spyOn(leaderboardApi, 'getGlobalLeaderboard').mockResolvedValue({
+      leaderboard: [{ telegramId: 1, firstName: 'Vali', username: null, rating: 2000, gamesWon: 10 }],
+    });
+    vi.spyOn(leagueApi, 'getMyLeague').mockResolvedValue({
+      tier: 'Oltin', weeklyXp: 120, bracket: [],
+    });
+
+    render(<HomeScreen />);
+
+    await screen.findByText('Top reyting');
+    expect(screen.getByText(/Oltin ligasi/)).toBeInTheDocument();
   });
 
   it('shows the Daily Quest card with progress and the daily activity streak once the profile loads', async () => {
