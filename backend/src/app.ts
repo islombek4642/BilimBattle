@@ -34,6 +34,16 @@ export function createApp() {
   app.use(express.json());
   app.use('/api/auth/login', authLoginLimiter);
   app.use('/api/admin/questions/import', adminImportLimiter);
+  // WARNING: this is a prefix mount, not an exact route match - every
+  // current and future path under /api/users/* runs through avatarLimiter's
+  // public/unauthenticated-tuned 60/min budget (see rateLimiters.ts's
+  // SPECIFIC_LIMIT_PATHS comment, which also excludes this whole prefix from
+  // generalApiLimiter below). Today that's fine because GET
+  // /users/:telegramId/avatar is the only route here. If you add another
+  // route under /api/users/*, give it its OWN specific rate limiter and path
+  // - don't let it silently inherit avatarLimiter's budget via this prefix
+  // match, and don't forget it will otherwise also be silently skipped by
+  // generalApiLimiter.
   app.use('/api/users', avatarLimiter);
   app.use('/api', generalApiLimiter);
   app.use('/api', authRouter);

@@ -36,6 +36,30 @@ describe('createRedisStore', () => {
     expect(res3.status).toBe(200);
     expect(res4.status).toBe(429);
   });
+
+  it('returns a JSON {error: string} body (not the library default plain-text message) once blocked', async () => {
+    const app = express();
+    app.use(
+      rateLimit({
+        windowMs: 60_000,
+        limit: 3,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: "Juda ko'p so'rov yuborildi. Birozdan so'ng qayta urinib ko'ring." },
+        store: createRedisStore(TEST_PREFIX),
+      })
+    );
+    app.get('/probe', (_req, res) => res.json({ ok: true }));
+
+    await request(app).get('/probe');
+    await request(app).get('/probe');
+    await request(app).get('/probe');
+    const res4 = await request(app).get('/probe');
+
+    expect(res4.status).toBe(429);
+    expect(res4.headers['content-type']).toMatch(/^application\/json/);
+    expect(res4.body).toEqual({ error: expect.any(String) });
+  });
 });
 
 describe('named rate limiters wired into the real app', () => {
