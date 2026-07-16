@@ -104,6 +104,13 @@ describe('gameEngine full match flow', () => {
     // cleanup already handles elsewhere in this file).
     await pool.query(`DELETE FROM subject_xp WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
     await pool.query(`DELETE FROM daily_quest_progress WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
+    // Same class of issue as subject_xp/daily_quest_progress above - Task 3
+    // wired accumulateWeeklyXp into progressionService.ts, which now also
+    // writes league_weekly_xp/user_league rows for every real ingliz_tili
+    // match played in this suite. Must be cleared before the final DELETE
+    // FROM users below, or that DELETE trips league_weekly_xp_user_id_fkey.
+    await pool.query(`DELETE FROM league_weekly_xp WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
+    await pool.query(`DELETE FROM user_league WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
     await pool.query(`DELETE FROM users WHERE telegram_id IN (7001, 7002)`);
     await pool.end();
     await closeRedis();

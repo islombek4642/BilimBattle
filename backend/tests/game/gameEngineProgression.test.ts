@@ -9,6 +9,7 @@ import * as questionRepository from '../../src/questions/questionRepository';
 import * as xpRepository from '../../src/progression/xpRepository';
 import { getSubjectProgress } from '../../src/progression/xpRepository';
 import { getTodayProgress } from '../../src/progression/dailyProgressRepository';
+import { getWeeklyXp } from '../../src/league/leagueRepository';
 
 function createFakeIO() {
   const sockets = new Map<string, { id: string; data: Record<string, unknown>; emit: () => void }>();
@@ -52,6 +53,8 @@ describe('gameEngine progression integration', () => {
     // users below, or that DELETE trips user_achievements_user_id_fkey. Same
     // pattern as gameEngineDisconnect.test.ts's afterAll.
     await pool.query(`DELETE FROM user_achievements WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
+    await pool.query(`DELETE FROM league_weekly_xp WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
+    await pool.query(`DELETE FROM user_league WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
     await pool.query(`DELETE FROM users WHERE telegram_id IN (7101, 7102)`);
     await pool.end();
     await closeRedis();
@@ -83,6 +86,7 @@ describe('gameEngine progression integration', () => {
     const progress1 = await getSubjectProgress(player1Id, 'ingliz_tili');
     expect(progress1.masteryPoints).toBe(7);
     expect(progress1.xp).toBeGreaterThan(0);
+    expect(await getWeeklyXp(player1Id)).toBe(progress1.xp);
 
     const progress2 = await getSubjectProgress(player2Id, 'ingliz_tili');
     expect(progress2.masteryPoints).toBe(0); // answered every question wrong

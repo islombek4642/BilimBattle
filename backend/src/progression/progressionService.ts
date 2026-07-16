@@ -5,6 +5,7 @@ import { addSubjectProgress } from './xpRepository';
 import { recordDailyMatch } from './dailyProgressRepository';
 import { recordDailyActivity } from '../users/userRepository';
 import { calculateLevelStars } from '../game/levelProgress';
+import { accumulateWeeklyXp } from '../league/leagueRepository';
 
 const TRACKED_CATEGORY = 'ingliz_tili';
 
@@ -43,6 +44,7 @@ export async function updateProgressionForRealPlayers(game: GameState): Promise<
       }, 0);
 
       await addSubjectProgress(player.userId, game.category, player.score, masteryPointsDelta);
+      await accumulateWeeklyXp(player.userId, player.score);
 
       const starsToday = game.level != null ? calculateLevelStars(correctCount) : null;
       await recordDailyMatch(player.userId, correctCount, starsToday);
