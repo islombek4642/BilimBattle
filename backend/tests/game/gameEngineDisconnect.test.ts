@@ -71,8 +71,23 @@ describe('gameEngine disconnect/reconnect handling', () => {
   let player2Id: number;
 
   beforeAll(async () => {
-    const p1 = await upsertUser(7101, 'p1d', 'Player1D', null);
-    const p2 = await upsertUser(7102, 'p2d', 'Player2D', null);
+    // 7401/7402, not 7101/7102: gameEngineProgression.test.ts also hardcodes
+    // 7101/7102 for its own two players. Jest runs test FILES in parallel
+    // against the same real Postgres database (see jest.config.js: no
+    // maxWorkers override, and statsQueries.test.ts's comment on the same
+    // topic), and upsertUser upserts on the telegram_id UNIQUE constraint -
+    // so two files sharing a telegram_id resolve to the literal same users
+    // row when their runs overlap in wall-clock time. That collision was
+    // harmless before this session's achievement-XP-crediting change (no
+    // test asserted an exact absolute value sensitive to it), but
+    // checkAndAwardMatchAchievements's forfeit-triggered awardAchievements
+    // calls in this suite now credit league_weekly_xp for the shared row,
+    // which broke gameEngineProgression.test.ts's exact
+    // `getWeeklyXp(player1Id) === progress1.xp` assertion when both suites
+    // happened to run concurrently. Using a distinct telegram_id pair here
+    // removes the shared row entirely.
+    const p1 = await upsertUser(7401, 'p1d', 'Player1D', null);
+    const p2 = await upsertUser(7402, 'p2d', 'Player2D', null);
     player1Id = p1.id;
     player2Id = p2.id;
   });
@@ -85,7 +100,14 @@ describe('gameEngine disconnect/reconnect handling', () => {
     // rows must be cleared before deleting the users themselves, or the
     // DELETE below trips user_achievements_user_id_fkey.
     await pool.query(`DELETE FROM user_achievements WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
-    await pool.query(`DELETE FROM users WHERE telegram_id IN (7101, 7102)`);
+    // checkAndAwardMatchAchievements (called from the same forfeit path, via
+    // awardMatchAchievementsForRealPlayers) now also triggers awardAchievements's
+    // XP-crediting side effect, which writes to league_weekly_xp/user_league for
+    // player1Id/player2Id - those rows must be cleared before deleting the users
+    // themselves, or the DELETE below trips league_weekly_xp_user_id_fkey.
+    await pool.query(`DELETE FROM league_weekly_xp WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
+    await pool.query(`DELETE FROM user_league WHERE user_id IN ($1, $2)`, [player1Id, player2Id]);
+    await pool.query(`DELETE FROM users WHERE telegram_id IN (7401, 7402)`);
     await pool.end();
     await closeRedis();
   });

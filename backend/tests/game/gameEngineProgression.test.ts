@@ -86,7 +86,18 @@ describe('gameEngine progression integration', () => {
     const progress1 = await getSubjectProgress(player1Id, 'ingliz_tili');
     expect(progress1.masteryPoints).toBe(7);
     expect(progress1.xp).toBeGreaterThan(0);
-    expect(await getWeeklyXp(player1Id)).toBe(progress1.xp);
+    // Weekly XP is no longer JUST this match's score: this is level 77 with
+    // a brand-new player1, so finishGame's level-mode branch also fires
+    // checkAndAwardLevelAchievements (level_10 + level_50, since 77 >= both
+    // thresholds) and awardMatchAchievementsForRealPlayers also fires
+    // games_1 (player1's first-ever game) - all three now credit
+    // league_weekly_xp too (see achievements.ts's awardAchievements). This
+    // test is about the match-score integration point, not achievement
+    // amounts (that's achievements.test.ts's job), so assert weekly XP is AT
+    // LEAST the match's own score contribution rather than hardcoding the
+    // exact achievement bonus, which would couple this file to unrelated
+    // reward tier constants.
+    expect(await getWeeklyXp(player1Id)).toBeGreaterThanOrEqual(progress1.xp);
 
     const progress2 = await getSubjectProgress(player2Id, 'ingliz_tili');
     expect(progress2.masteryPoints).toBe(0); // answered every question wrong
