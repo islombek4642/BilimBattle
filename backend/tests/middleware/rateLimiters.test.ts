@@ -1,6 +1,7 @@
 import express from 'express';
 import request from 'supertest';
 import rateLimit from 'express-rate-limit';
+import { pool } from '../../src/config/db';
 import { redis, closeRedis } from '../../src/config/redis';
 import { createRedisStore } from '../../src/middleware/rateLimiters';
 
@@ -62,10 +63,14 @@ describe('named rate limiters wired into the real app', () => {
   });
 });
 
-// Every test file in this suite that touches the shared `redis` singleton
-// (see config/redis.ts) closes it here so Jest can exit cleanly instead of
-// hanging on the open connection - same convention as
-// tests/game/gameState.test.ts, tests/matchmaking/queue.test.ts, etc.
+// The second describe block above imports the full app (createApp()),
+// which transitively pulls in src/config/db.ts's Postgres `pool` (via
+// questionsRoutes, leaderboardRoutes, etc.) in addition to the shared
+// `redis` singleton - so both must be closed here for Jest to exit
+// cleanly, not just Redis. Same convention/order as
+// tests/integration/socketServer.test.ts, which also builds the full
+// app/server.
 afterAll(async () => {
+  await pool.end();
   await closeRedis();
 });
