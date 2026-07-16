@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Crown, Star } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 import { getGlobalLeaderboard, getFriendsLeaderboard } from '../api/leaderboard';
+import { getMyLeague, LeagueResponse } from '../api/league';
 import { LeaderboardEntry } from '../api/types';
 import { findRank } from '../utils/leaderboardRank';
 import { BattleAvatar } from '../components/BattleAvatar';
@@ -43,7 +44,8 @@ function PodiumSlot({ entry, rank }: { entry: LeaderboardEntry | undefined; rank
 
 export function LeaderboardScreen() {
   const { token, user } = useAuth();
-  const [tab, setTab] = useState<'global' | 'friends'>('global');
+  const [tab, setTab] = useState<'global' | 'friends' | 'league'>('global');
+  const [league, setLeague] = useState<LeagueResponse | null>(null);
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -55,20 +57,36 @@ export function LeaderboardScreen() {
     setLoading(true);
     setError(false);
 
-    const fetcher = tab === 'global' ? getGlobalLeaderboard : getFriendsLeaderboard;
-    fetcher(token)
-      .then((res) => {
-        if (cancelled) return;
-        setEntries(res.leaderboard);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setError(true);
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoading(false);
-      });
+    if (tab === 'league') {
+      getMyLeague(token)
+        .then((res) => {
+          if (cancelled) return;
+          setLeague(res);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setError(true);
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setLoading(false);
+        });
+    } else {
+      const fetcher = tab === 'global' ? getGlobalLeaderboard : getFriendsLeaderboard;
+      fetcher(token)
+        .then((res) => {
+          if (cancelled) return;
+          setEntries(res.leaderboard);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setError(true);
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setLoading(false);
+        });
+    }
 
     return () => {
       cancelled = true;
@@ -81,7 +99,7 @@ export function LeaderboardScreen() {
 
   return (
     <div className="flex flex-col gap-4 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
-      <h2 className="text-lg font-bold text-ios-label">Top reyting</h2>
+      {tab !== 'league' && <h2 className="text-lg font-bold text-ios-label">Top reyting</h2>}
 
       <div className="flex gap-1 rounded-full bg-ios-divider p-1">
         <button
@@ -104,15 +122,53 @@ export function LeaderboardScreen() {
         >
           Do'stlar
         </button>
+        <button
+          type="button"
+          aria-current={tab === 'league' ? 'page' : undefined}
+          className={`flex-1 rounded-full py-2 text-sm font-semibold transition-colors duration-150 ${
+            tab === 'league' ? 'bg-ios-card text-ios-label shadow-sm' : 'text-ios-secondary-label'
+          }`}
+          onClick={() => setTab('league')}
+        >
+          Liga
+        </button>
       </div>
 
       {loading && <p className="text-sm text-ios-secondary-label">Yuklanmoqda...</p>}
       {!loading && error && <p className="text-sm text-ios-red">Reytingni yuklab bo'lmadi.</p>}
-      {!loading && !error && myRank !== null && (
+      {!loading && !error && tab !== 'league' && myRank !== null && (
         <p className="text-sm font-medium text-ios-secondary-label">Sizning o'rningiz: {myRank}</p>
       )}
 
-      {!loading && !error && podium.length > 0 && (
+      {!loading && !error && tab === 'league' && league && (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col items-center gap-1 rounded-2xl bg-ios-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
+            <span className="text-lg font-bold text-ios-label">{league.tier}</span>
+            <span className="text-sm text-ios-secondary-label">{league.weeklyXp} XP (bu hafta)</span>
+          </div>
+          {league.bracket.length > 0 && (
+            <ul className="flex flex-col gap-2 rounded-2xl bg-ios-card p-2 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
+              {league.bracket.map((entry, index) => (
+                <li
+                  key={entry.telegramId}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
+                    index < league.bracket.length - 1 ? 'border-b border-ios-divider' : ''
+                  }`}
+                >
+                  <span className="w-5 text-center text-sm font-bold tabular-nums text-ios-secondary-label">
+                    {index + 1}
+                  </span>
+                  <BattleAvatar telegramId={entry.telegramId} size={36} />
+                  <span className="flex-1 truncate font-medium text-ios-label">{entry.firstName}</span>
+                  <span className="font-semibold tabular-nums text-ios-label">{entry.weeklyXp} XP</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {!loading && !error && tab !== 'league' && podium.length > 0 && (
         <div className="flex items-end gap-3 rounded-2xl bg-ios-card p-4 pt-8 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
           <PodiumSlot entry={podium[1]} rank={2} />
           <PodiumSlot entry={podium[0]} rank={1} />
@@ -120,7 +176,7 @@ export function LeaderboardScreen() {
         </div>
       )}
 
-      {!loading && !error && rest.length > 0 && (
+      {!loading && !error && tab !== 'league' && rest.length > 0 && (
         <ul className="flex flex-col gap-2 rounded-2xl bg-ios-card p-2 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
           {rest.map((entry, index) => (
             <li

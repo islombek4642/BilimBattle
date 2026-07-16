@@ -4,12 +4,18 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { LeaderboardScreen } from './LeaderboardScreen';
 import * as authContext from '../context/AuthContext';
 import * as leaderboardApi from '../api/leaderboard';
+import * as leagueApi from '../api/league';
 
 describe('LeaderboardScreen', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.spyOn(authContext, 'useAuth').mockReturnValue({
       token: 'tok', user: { id: 1, telegramId: 111 } as any, loading: false, error: null,
+    });
+    vi.spyOn(leagueApi, 'getMyLeague').mockResolvedValue({
+      tier: 'Bronza',
+      weeklyXp: 0,
+      bracket: [],
     });
   });
 
@@ -73,5 +79,31 @@ describe('LeaderboardScreen', () => {
     render(<LeaderboardScreen />);
 
     await waitFor(() => expect(screen.getByText(/Reytingni yuklab bo'lmadi/)).toBeInTheDocument());
+  });
+
+  it('shows a "Liga" tab and switches to league data when clicked', async () => {
+    vi.spyOn(leagueApi, 'getMyLeague').mockResolvedValue({
+      tier: 'Oltin',
+      weeklyXp: 340,
+      bracket: [
+        { telegramId: 555, firstName: 'Aziz', weeklyXp: 340 },
+        { telegramId: 777, firstName: 'Vali', weeklyXp: 200 },
+      ],
+    });
+
+    render(<LeaderboardScreen />);
+    fireEvent.click(await screen.findByText('Liga'));
+
+    await screen.findByText('Oltin');
+    expect(screen.getAllByText(/340/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Aziz')).toBeInTheDocument();
+    expect(screen.getByText('Vali')).toBeInTheDocument();
+  });
+
+  it('does not show global/friends podium content while on the Liga tab', async () => {
+    render(<LeaderboardScreen />);
+    fireEvent.click(await screen.findByText('Liga'));
+    await screen.findByText('Bronza');
+    expect(screen.queryByText('Top reyting')).not.toBeInTheDocument();
   });
 });
