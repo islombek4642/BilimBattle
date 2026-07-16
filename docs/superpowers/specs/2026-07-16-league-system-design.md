@@ -21,8 +21,9 @@ Tadqiqot shuni ko'rsatdi: backend'da HECH QANDAY job-scheduling kutubxonasi yo'q
 
 **Deploy talabi (kod EMAS, operatsion qadam):** production serverda `crontab -e` orqali quyidagi qatorni qo'shish kerak bo'ladi (implementatsiya rejasi buni aniq eslatib o'tadi, lekin bu — CEFR migratsiyasi kabi, qo'lda bajariladigan bir martalik sozlash):
 ```
-5 0 * * 1 curl -X POST -u admin:$ADMIN_PASSWORD https://<domain>/api/admin/league/process-week
+5 0 * * 1 curl -X POST -u admin:$ADMIN_PASSWORD https://api.bilimbattle.uz/api/admin/league/process-week
 ```
+**MUHIM:** manzil aniq `API_DOMAIN` (`api.bilimbattle.uz`) bo'lishi shart, `WEBAPP_DOMAIN` (`bilimbattle.uz`) EMAS — bular `docker-compose.yml`da ikkita alohida `VIRTUAL_HOST` (nginx-proxy vhost). `bilimbattle.uz`ga POST yuborilsa, so'rov frontend statik konteynerining nginx'iga (`frontend/nginx.conf`, faqat static fayllarni beradi) tushadi va `405 Not Allowed` qaytaradi — bu production'da haqiqatan ham yuz berdi va `api.bilimbattle.uz`ga tuzatilib, tasdiqlandi (2026-07-17).
 
 ## Ma'lumotlar modeli
 

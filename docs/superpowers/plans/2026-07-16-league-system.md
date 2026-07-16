@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-16-league-system-design.md`
 
-**Deployment note (not part of any task below, a manual step for whoever deploys this):** after this plan ships, add a crontab entry on the production server, e.g. `5 0 * * 1 curl -X POST -u admin:$ADMIN_PASSWORD https://<domain>/api/admin/league/process-week` (runs every Monday at 00:05).
+**Deployment note (not part of any task below, a manual step for whoever deploys this):** after this plan ships, add a crontab entry on the production server, e.g. `5 0 * * 1 curl -X POST -u admin:$ADMIN_PASSWORD https://api.bilimbattle.uz/api/admin/league/process-week` (runs every Monday at 00:05). **Must target `API_DOMAIN` (`api.bilimbattle.uz`), not `WEBAPP_DOMAIN` (`bilimbattle.uz`)** — the two are separate nginx-proxy vhosts (see `docker-compose.yml`'s `VIRTUAL_HOST` env vars); hitting the webapp domain reaches the static frontend container's nginx (`frontend/nginx.conf`), which 405s on POST instead of proxying to the API.
 
 ---
 
