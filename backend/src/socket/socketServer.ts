@@ -8,6 +8,7 @@ import { isValidCategory } from '../questions/questionRepository';
 import { getUserById } from '../users/userRepository';
 import { isLevelUnlockedForUser } from '../game/levelProgress';
 import { env } from '../config/env';
+import { isThrottled, clearSocketThrottleState } from './socketThrottle';
 
 export interface SocketData {
   userId: number;
@@ -20,6 +21,16 @@ export type AppSocket = Socket<any, any, any, SocketData>;
 
 let io: AppServer | null = null;
 let activeSocketsByUser = new Map<number, string>();
+
+// Per-event throttle budgets. submit_answer gets the highest budget since
+// it's the hottest legitimate path (one emit per question, but a fast
+// double-tap or a client retry shouldn't be punished); the queue/invite
+// events are all much rarer in legitimate use, so a tighter budget there
+// doesn't affect real users.
+const SUBMIT_ANSWER_THROTTLE = { max: 10, windowMs: 1000 };
+const QUEUE_THROTTLE = { max: 5, windowMs: 1000 };
+const INVITE_THROTTLE = { max: 5, windowMs: 1000 };
+const RECONNECT_THROTTLE = { max: 5, windowMs: 1000 };
 
 function trackActiveSocket(io: AppServer, socket: AppSocket, userId: number): void {
   const existingSocketId = activeSocketsByUser.get(userId);
@@ -36,6 +47,7 @@ function trackActiveSocket(io: AppServer, socket: AppSocket, userId: number): vo
     if (activeSocketsByUser.get(userId) === socket.id) {
       activeSocketsByUser.delete(userId);
     }
+    clearSocketThrottleState(socket.id);
   });
 }
 
@@ -71,6 +83,7 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     // operational noise, not an edge case - left unhandled it would crash the
     // entire process and kill every concurrent match, not just this one.
     socket.on('submit_answer', ({ gameId, questionIndex, selectedOption }: { gameId: string; questionIndex: number; selectedOption: number }) => {
+      if (isThrottled(socket.id, 'submit_answer', SUBMIT_ANSWER_THROTTLE.max, SUBMIT_ANSWER_THROTTLE.windowMs)) return;
       submitAnswer(gameId, socket.data.userId, selectedOption, questionIndex).catch((err) => {
         console.error(`socketServer: failed to submit answer for game ${gameId}`, err);
       });
@@ -78,6 +91,7 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
 
     // Same fire-and-forget hazard as submit_answer above - wrapped in .catch().
     socket.on('join_queue', ({ category }: { category: string }) => {
+      if (isThrottled(socket.id, 'join_queue', QUEUE_THROTTLE.max, QUEUE_THROTTLE.windowMs)) return;
       // Refuse to queue this socket while it's already in an active game -
       // otherwise a stray join_queue mid-match would pair this user into a
       // second concurrent match, silently overwriting socket.data.gameId and
@@ -93,6 +107,7 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     });
 
     socket.on('leave_queue', ({ category }: { category: string }) => {
+      if (isThrottled(socket.id, 'leave_queue', QUEUE_THROTTLE.max, QUEUE_THROTTLE.windowMs)) return;
       cancelWaiting(socket.data.userId, category);
     });
 
@@ -104,6 +119,7 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     // same hazard already noted on the 'disconnect' handler below - so the
     // whole body is wrapped in try/catch.
     socket.on('create_invite', async ({ category }: { category: string }) => {
+      if (isThrottled(socket.id, 'create_invite', INVITE_THROTTLE.max, INVITE_THROTTLE.windowMs)) return;
       try {
         if (!(await isValidCategory(category))) return;
         // Refuse to create an invite while this socket is already in an
@@ -129,6 +145,7 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     // validate the invitee's category so a malformed/garbage payload is
     // rejected up front, but it otherwise carries no weight in this handler.
     socket.on('join_invite', async ({ inviterTelegramId, category }: { inviterTelegramId: number; category: string }) => {
+      if (isThrottled(socket.id, 'join_invite', INVITE_THROTTLE.max, INVITE_THROTTLE.windowMs)) return;
       try {
         // inviterTelegramId comes straight from client input, unlike
         // category which is checked by isValidCategory below - without this
@@ -188,6 +205,7 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     // internally, see matchmaker.ts's handleJoinLevelQueue), just a basic
     // sanity check on the level number itself.
     socket.on('join_level_queue', ({ level }: { level: number }) => {
+      if (isThrottled(socket.id, 'join_level_queue', QUEUE_THROTTLE.max, QUEUE_THROTTLE.windowMs)) return;
       if (!Number.isInteger(level) || level < 1) return;
       if (socket.data.gameId) {
         console.log(`socketServer: ignoring join_level_queue from userId=${socket.data.userId} - socket already has an active gameId=${socket.data.gameId}`);
@@ -199,11 +217,13 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     });
 
     socket.on('leave_level_queue', ({ level }: { level: number }) => {
+      if (isThrottled(socket.id, 'leave_level_queue', QUEUE_THROTTLE.max, QUEUE_THROTTLE.windowMs)) return;
       if (!Number.isInteger(level) || level < 1) return;
       cancelWaiting(socket.data.userId, `level:${level}`);
     });
 
     socket.on('create_level_invite', async ({ level }: { level: number }) => {
+      if (isThrottled(socket.id, 'create_level_invite', INVITE_THROTTLE.max, INVITE_THROTTLE.windowMs)) return;
       try {
         if (!Number.isInteger(level) || level < 1) return;
         if (socket.data.gameId) return;
@@ -224,6 +244,7 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     });
 
     socket.on('join_level_invite', async ({ inviterTelegramId }: { inviterTelegramId: number }) => {
+      if (isThrottled(socket.id, 'join_level_invite', INVITE_THROTTLE.max, INVITE_THROTTLE.windowMs)) return;
       try {
         if (typeof inviterTelegramId !== 'number' || !Number.isFinite(inviterTelegramId)) return;
         if (socket.data.gameId) return;
@@ -266,6 +287,7 @@ export function initSocketServer(httpServer: ReturnType<typeof createServer>): A
     // off as a promise chain terminated in .catch() instead, so a rejection
     // out of handleReconnect can't take down the process.
     socket.on('reconnect_game', ({ gameId }: { gameId: string }, ack: (state: unknown) => void) => {
+      if (isThrottled(socket.id, 'reconnect_game', RECONNECT_THROTTLE.max, RECONNECT_THROTTLE.windowMs)) return;
       // A client that emits this event with no ack callback (buggy client,
       // or an old client build) would otherwise crash this handler on
       // `ack(...)` below ("ack is not a function") - there's no global

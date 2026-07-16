@@ -210,6 +210,25 @@ describe('socket server session handling', () => {
     }
   });
 
+  it('throttles rapid join_queue emissions from the same socket', (done) => {
+    const handleJoinQueueSpy = jest.spyOn(matchmaker, 'handleJoinQueue').mockResolvedValue(undefined);
+    const token = signSession({ userId: 8888, telegramId: 8888 });
+    const client: ClientSocket = ioClient(`http://localhost:${port}`, { auth: { token } });
+
+    client.on('connect', () => {
+      for (let i = 0; i < 10; i += 1) {
+        client.emit('join_queue', { category: 'umumiy_bilim' });
+      }
+      setTimeout(() => {
+        expect(handleJoinQueueSpy.mock.calls.length).toBeGreaterThan(0);
+        expect(handleJoinQueueSpy.mock.calls.length).toBeLessThanOrEqual(5);
+        handleJoinQueueSpy.mockRestore();
+        client.close();
+        done();
+      }, 100);
+    });
+  });
+
   // Regression test: a user opening their own invite link (previewing it,
   // or accidentally tapping their own "share" link) used to sail straight
   // through join_invite and get matched against themselves - createMatch
