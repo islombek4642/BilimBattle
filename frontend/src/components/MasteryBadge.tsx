@@ -24,7 +24,9 @@ const RANK_CLASSNAME: Record<MasteryRank, string> = {
 
 export function MasteryBadge({ rank }: { rank: MasteryRank }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${RANK_CLASSNAME[rank]}`}>
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${RANK_CLASSNAME[rank]}`}
+    >
       {RANK_LABEL[rank]}
     </span>
   );

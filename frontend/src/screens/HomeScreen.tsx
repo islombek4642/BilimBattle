@@ -83,7 +83,7 @@ export function HomeScreen() {
 
   return (
     <div className="flex min-h-full flex-col gap-5 p-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <BattleAvatar
           telegramId={user.telegramId}
           size={44}
