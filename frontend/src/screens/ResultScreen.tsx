@@ -57,7 +57,7 @@ export function ResultScreen({
     playResultFeedback(isDraw ? 'draw' : isWinner ? 'win' : 'loss');
   }, []);
 
-  const [newAchievementLabel, setNewAchievementLabel] = useState<string | null>(null);
+  const [newAchievement, setNewAchievement] = useState<{ label: string; xpReward: number } | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -68,7 +68,8 @@ export function ResultScreen({
         const newly = findAndMarkNewlySeenAchievements(res.earned.map((e) => e.key));
         if (newly.length === 0) return;
         const catalogByKey = new Map(res.catalog.map((a) => [a.key, a]));
-        setNewAchievementLabel(catalogByKey.get(newly[0])?.label ?? newly[0]);
+        const achievement = catalogByKey.get(newly[0]);
+        setNewAchievement({ label: achievement?.label ?? newly[0], xpReward: achievement?.xpReward ?? 0 });
       })
       .catch(() => {});
     return () => {
@@ -89,9 +90,9 @@ export function ResultScreen({
   if (isLevelResult) {
     return (
       <div className="flex min-h-full flex-col justify-center gap-8 p-6">
-        {newAchievementLabel && (
+        {newAchievement && (
           <div className="animate-star-pop rounded-2xl bg-ios-gold/10 px-4 py-3 text-center text-sm font-semibold text-ios-label">
-            🏆 Yangi nishon: {newAchievementLabel}
+            🏆 Yangi nishon: {newAchievement.label} (+{newAchievement.xpReward} XP)
           </div>
         )}
         <div className="flex flex-col items-center gap-3 rounded-2xl bg-ios-card px-6 py-10 text-center shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">
@@ -143,9 +144,9 @@ export function ResultScreen({
 
   return (
     <div className="flex min-h-full flex-col justify-center gap-8 p-6">
-      {newAchievementLabel && (
+      {newAchievement && (
         <div className="animate-star-pop rounded-2xl bg-ios-gold/10 px-4 py-3 text-center text-sm font-semibold text-ios-label">
-          🏆 Yangi nishon: {newAchievementLabel}
+          🏆 Yangi nishon: {newAchievement.label} (+{newAchievement.xpReward} XP)
         </div>
       )}
       <div className="flex flex-col items-center gap-3 rounded-2xl bg-ios-card px-6 py-10 text-center shadow-[0_1px_3px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.04)]">

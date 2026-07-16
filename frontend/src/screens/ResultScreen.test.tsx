@@ -261,7 +261,7 @@ describe('ResultScreen', () => {
     expect(reset).toHaveBeenCalledWith({ name: 'waiting', level: 5, intent: 'quick' });
   });
 
-  it('shows a "Yangi nishon!" banner when a newly earned achievement is detected after the match', async () => {
+  it('shows a "Yangi nishon!" banner with its XP reward when a newly earned achievement is detected after the match', async () => {
     localStorage.clear();
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
       catalog: [{ key: 'games_1', category: 'games', label: 'Birinchi qadam', description: '...', xpReward: 50 }],
@@ -270,10 +270,10 @@ describe('ResultScreen', () => {
 
     render(<ResultScreen scores={[]} winnerId={null} forfeited={false} knockout={false} level={5} />);
 
-    await screen.findByText(/Yangi nishon: Birinchi qadam/);
+    await screen.findByText(/Yangi nishon: Birinchi qadam \(\+50 XP\)/);
   });
 
-  it('shows the achievement banner in the level-complete branch too', async () => {
+  it('shows the achievement banner with its XP reward in the level-complete branch too', async () => {
     localStorage.clear();
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
       catalog: [{ key: 'level_10', category: 'level', label: 'Bosqichlar ustasi I', description: '...', xpReward: 100 }],
@@ -282,7 +282,7 @@ describe('ResultScreen', () => {
 
     render(<ResultScreen scores={[]} winnerId={null} forfeited={false} knockout={false} level={10} levelStars={2} />);
 
-    await screen.findByText(/Yangi nishon: Bosqichlar ustasi I/);
+    await screen.findByText(/Yangi nishon: Bosqichlar ustasi I \(\+100 XP\)/);
   });
 
   it('does not show a banner when there is nothing newly earned', async () => {
