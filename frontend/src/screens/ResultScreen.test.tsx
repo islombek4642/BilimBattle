@@ -276,7 +276,7 @@ describe('ResultScreen', () => {
   it('shows the achievement banner in the level-complete branch too', async () => {
     localStorage.clear();
     vi.spyOn(achievementsApi, 'getAchievements').mockResolvedValue({
-      catalog: [{ key: 'level_10', category: 'level', label: 'Bosqichlar ustasi I', description: '...', xpReward: 200 }],
+      catalog: [{ key: 'level_10', category: 'level', label: 'Bosqichlar ustasi I', description: '...', xpReward: 100 }],
       earned: [{ key: 'level_10', earnedAt: '2026-07-14T00:00:00.000Z' }],
     });
 
